@@ -30,8 +30,13 @@
   1. Login page opens.
   2. Enter main page.
   3. STT button shows streaming subtitle and auto-stop.
-  4. TTS button plays preset text.
+  4. After STT final, text is auto-sent to AI; toast shows sent status.
+  5. AI reply updates subtitle area; TTS speaks reply by sentence chunks.
+  6. TTS test button still plays preset text.
 - If STT regresses, capture `error.txt` in repo root.
+- If AI/TTS latency sounds abnormal, capture `logcat.txt` and filter tags:
+  - `MainVoiceChain`
+  - `SherpaTts`
 
 ## Commit & Pull Request Guidelines
 - Use focused commits with prefixes: `feat:`, `fix:`, `refactor:`, `chore:`.
@@ -44,3 +49,11 @@
   2. `PROJECT_MEMORY.md` (legacy snapshot)
 - Always cross-reference old implementation ideas from:
   - `D:\AndroidStudioProjects\vhuman\ztjyaimetahumant`
+
+## Current Runtime Baseline
+- AI SDK: `com.alibaba:dashscope-sdk-java:2.22.9`.
+- AI call path is enabled in `MainActivity` using `DashScopeManager`.
+- TTS baseline for naturalness:
+  - playback rate fixed at `1.0` (no time-stretch effect),
+  - model `lengthScale = 1.08`,
+  - startup silent warmup synthesis enabled.

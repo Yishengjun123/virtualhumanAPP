@@ -1,0 +1,53 @@
+2026-03-03 19:48:54.859  2446-3350  MainVoiceChain          com.example.virhuman                 D  AI回复(chunk): 大家好，
+2026-03-03 19:48:54.860  2446-3350  MainVoiceChain          com.example.virhuman                 D  AI回复(merged): 大家好，
+2026-03-03 19:48:54.926  2446-3350  MainVoiceChain          com.example.virhuman                 D  AI回复(chunk): 我是南通地铁吉祥物通通。
+2026-03-03 19:48:54.926  2446-3350  MainVoiceChain          com.example.virhuman                 D  AI回复(merged): 大家好，我是南通地铁吉祥物通通。
+2026-03-03 19:48:54.927  2446-3350  MainVoiceChain          com.example.virhuman                 D  TTS播报(segment): 大家好，我是南通地铁吉祥物通通。
+2026-03-03 19:48:54.944  2446-3350  MainVoiceChain          com.example.virhuman                 D  AI回复(chunk): 我身着红色未来机甲，是南通轨道交通的小小守护者，代表“
+2026-03-03 19:48:54.944  2446-3350  MainVoiceChain          com.example.virhuman                 D  AI回复(merged): 大家好，我是南通地铁吉祥物通通。我身着红色未来机甲，是南通轨道交通的小小守护者，代表“
+2026-03-03 19:48:54.962  2446-3350  MainVoiceChain          com.example.virhuman                 D  AI回复(chunk): 用心呵护 爱在通途”的服务理念。有什么问题我可以帮你解答哦！
+2026-03-03 19:48:54.963  2446-3350  MainVoiceChain          com.example.virhuman                 D  AI回复(merged): 大家好，我是南通地铁吉祥物通通。我身着红色未来机甲，是南通轨道交通的小小守护者，代表“用心呵护 爱在通途”的服务理念。有什么问题我可以帮你解答哦！
+2026-03-03 19:48:54.963  2446-3350  MainVoiceChain          com.example.virhuman                 D  TTS播报(segment): 我身着红色未来机甲，是南通轨道交通的小小守护者，代表“用心呵护 爱在通途”的服务理念。
+2026-03-03 19:48:55.077  2446-3350  MainVoiceChain          com.example.virhuman                 D  AI回复(final): 大家好，我是南通地铁吉祥物通通。我身着红色未来机甲，是南通轨道交通的小小守护者，代表“用心呵护 爱在通途”的服务理念。有什么问题我可以帮你解答哦！
+2026-03-03 19:48:55.077  2446-3350  MainVoiceChain          com.example.virhuman                 D  TTS播报(segment): 有什么问题我可以帮你解答哦！
+2026-03-03 19:48:57.470  2446-3386  SherpaTts               com.example.virhuman                 D  TTS播报(text): 大家好，我是南通地铁吉祥物通通。
+2026-03-03 19:48:57.470  2446-3386  SherpaTts               com.example.virhuman                 D  TTS播报(samples=143872, rate=44100, speechRate=0.9)
+2026-03-03 19:48:57.518  2446-3064  AudioSystem             com.example.virhuman                 D  onNewService: media.audio_policy service obtained 0xb40000725e4865b0
+2026-03-03 19:48:57.519  2446-3386  sherpa-onnx             com.example.virhuman                 W  /home/runner/work/sherpa-onnx/sherpa-onnx/sherpa-onnx/csrc/melo-tts-lexicon.cc:ConvertTextToTokenIds:120
+2026-03-03 19:48:57.519  2446-3386  sherpa-onnx             com.example.virhuman                 W  Ignore OOV '“'
+2026-03-03 19:48:57.519  2446-3386  sherpa-onnx             com.example.virhuman                 W  /home/runner/work/sherpa-onnx/sherpa-onnx/sherpa-onnx/csrc/melo-tts-lexicon.cc:ConvertTextToTokenIds:120
+2026-03-03 19:48:57.519  2446-3386  sherpa-onnx             com.example.virhuman                 W  Ignore OOV '”'
+2026-03-03 19:48:57.519  2446-3064  AudioSystem             com.example.virhuman                 D  getService: checking for service media.audio_policy: 0xb40000725e4865b0
+2026-03-03 19:48:57.524  2446-3064  AudioTrack              com.example.virhuman                 I  set(): streamType -1, sampleRate 44100, format 0x1, channelMask 0x1, frameCount 143872, flags 0, notificationFrames 0, sessionId 0, transferType 3, uid 10156, pid 2446
+2026-03-03 19:48:57.525  2446-3064  AudioTrack              com.example.virhuman                 D  set(): Building AudioTrack with attributes: usage=1 content=1 flags=0xa00 tags=[]
+2026-03-03 19:48:57.525  2446-3064  AudioTrack              com.example.virhuman                 D  get APPSharePck NULL
+2026-03-03 19:48:57.525  2446-3064  AudioSystem             com.example.virhuman                 D  add vgclist = null clientPkg = com.example.virhuman vgcroname = ro.vivo.cust.incallmusic.whitelist.pkgs
+2026-03-03 19:48:57.525  2446-3064  AudioSystem             com.example.virhuman                 D  vgclist unavailable
+2026-03-03 19:48:57.525  2446-3064  AudioSystem             com.example.virhuman                 W  setParameters: PlaybackCaptureProtectSupport=com.example.virhuman
+2026-03-03 19:48:57.525  2446-3064  AudioTrack              com.example.virhuman                 D  get APPSharePck NULL
+2026-03-03 19:48:57.538  2446-3064  PlayerBase              com.example.virhuman                 V  baseStart() piid=14415 deviceId=[]
+2026-03-03 19:48:57.538  2446-3064  AudioTrack              com.example.virhuman                 I  start(calling package is:com.example.virhuman, portId:1939, sessionId:21201): prior state:STATE_STOPPED
+2026-03-03 19:48:57.616  2446-2561  AidlConversionCppNdk    com.example.virhuman                 W  aidl2legacy_AudioChannelLayout_audio_channel_mask_t: no legacy output audio_channel_mask_t found for AudioChannelLayout{layoutMask: 16}
+2026-03-03 19:49:00.917  2446-3064  AudioTrack              com.example.virhuman                 I  stop(calling package is:com.example.virhuman, portId:1939, sessionId:21201): prior state:STATE_ACTIVE
+2026-03-03 19:49:00.917  2446-3064  AudioTrack              com.example.virhuman                 D  stop(1939): called with 143872 frames delivered
+2026-03-03 19:49:00.919  2446-3064  PlayerBase              com.example.virhuman                 I  baseStop() piid=14415
+2026-03-03 19:49:00.920  2446-3064  AudioTrack              com.example.virhuman                 I  stop(calling package is:com.example.virhuman, portId:1939, sessionId:21201): prior state:STATE_STOPPED
+2026-03-03 19:49:00.920  2446-3064  PlayerBase              com.example.virhuman                 I  baseStop() piid=14415
+2026-03-03 19:49:00.920  2446-3064  PlayerBase              com.example.virhuman                 V  baseRelease() piid=14415 state=4
+2026-03-03 19:49:00.921  2446-3064  AudioTrack              com.example.virhuman                 I  stop(calling package is:com.example.virhuman, portId:1939, sessionId:21201): prior state:STATE_STOPPED
+2026-03-03 19:49:00.921  2446-3064  AudioTrack              com.example.virhuman                 D  requestExitAndWait start
+2026-03-03 19:49:00.921  2446-3064  AudioTrack              com.example.virhuman                 D  requestExitAndWait end
+2026-03-03 19:49:03.498  2446-3386  SherpaTts               com.example.virhuman                 D  TTS播报(text): 我身着红色未来机甲，是南通轨道交通的小小守护者，代表“用心呵护 爱在通途”的服务理念。
+2026-03-03 19:49:03.498  2446-3386  SherpaTts               com.example.virhuman                 D  TTS播报(samples=328282, rate=44100, speechRate=0.9)
+2026-03-03 19:49:03.501  2446-3064  AudioTrack              com.example.virhuman                 I  set(): streamType -1, sampleRate 44100, format 0x1, channelMask 0x1, frameCount 328282, flags 0, notificationFrames 0, sessionId 0, transferType 3, uid 10156, pid 2446
+2026-03-03 19:49:03.501  2446-3064  AudioTrack              com.example.virhuman                 D  set(): Building AudioTrack with attributes: usage=1 content=1 flags=0xa00 tags=[]
+2026-03-03 19:49:03.501  2446-3064  AudioTrack              com.example.virhuman                 D  get APPSharePck NULL
+2026-03-03 19:49:03.502  2446-3064  AudioSystem             com.example.virhuman                 D  add vgclist = null clientPkg = com.example.virhuman vgcroname = ro.vivo.cust.incallmusic.whitelist.pkgs
+2026-03-03 19:49:03.502  2446-3064  AudioSystem             com.example.virhuman                 D  vgclist unavailable
+2026-03-03 19:49:03.502  2446-3064  AudioSystem             com.example.virhuman                 W  setParameters: PlaybackCaptureProtectSupport=com.example.virhuman
+2026-03-03 19:49:03.502  2446-3064  AudioTrack              com.example.virhuman                 D  get APPSharePck NULL
+2026-03-03 19:49:03.509  2446-3064  PlayerBase              com.example.virhuman                 V  baseStart() piid=14423 deviceId=[]
+2026-03-03 19:49:03.510  2446-3064  AudioTrack              com.example.virhuman                 I  start(calling package is:com.example.virhuman, portId:1940, sessionId:21209): prior state:STATE_STOPPED
+2026-03-03 19:49:03.576  2446-2467  AidlConversionCppNdk    com.example.virhuman                 W  aidl2legacy_AudioChannelLayout_audio_channel_mask_t: no legacy output audio_channel_mask_t found for AudioChannelLayout{layoutMask: 16}
+2026-03-03 19:49:05.380  2446-3386  SherpaTts               com.example.virhuman                 D  TTS播报(text): 有什么问题我可以帮你解答哦！
+2026-03-03 19:49:05.380  2446-3386  SherpaTts               com.example.virhuman                 D  TTS播报(samples=108544, rate=44100, speechRate=0.9)
