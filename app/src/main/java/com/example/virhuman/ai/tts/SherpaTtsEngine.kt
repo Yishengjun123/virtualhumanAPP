@@ -5,17 +5,34 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
+import android.os.SystemClock
+import android.util.Log
 import com.k2fsa.sherpa.onnx.OfflineTts
 import com.k2fsa.sherpa.onnx.OfflineTtsConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import java.util.concurrent.Executors
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.atomic.AtomicBoolean
 
 class SherpaTtsEngine(context: Context) : TtsEngine {
+    private val tag = "SherpaTts"
     private var tts: OfflineTts? = null
     private var audioTrack: AudioTrack? = null
-    private val executor = Executors.newSingleThreadExecutor()
+    private val synthExecutor = Executors.newSingleThreadExecutor()
+    private val playQueue = LinkedBlockingQueue<AudioSegment>()
+    private val running = AtomicBoolean(true)
+    private var playerThread: Thread? = null
     private var ready = false
+    @Volatile private var speechRate = 1.0f
+    @Volatile private var generation = 0
+
+    private data class AudioSegment(
+        val pcm: ShortArray,
+        val sampleRate: Int,
+        val text: String,
+        val generation: Int
+    )
 
     init {
         try {
@@ -27,7 +44,8 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
                 dictDir = "sherpa/tts/dict"
                 noiseScale = 0.667f
                 noiseScaleW = 0.8f
-                lengthScale = 1.0f
+                // Slightly slower than default, more natural than playback-rate stretching.
+                lengthScale = 1.08f
             }
 
             val modelConfig = OfflineTtsModelConfig().apply {
@@ -45,6 +63,9 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
 
             tts = OfflineTts(context.assets, config)
             ready = true
+            startPlayerLoop()
+            // Warm up model to reduce first real-sentence latency (no playback).
+            warmupSynthesis()
         } catch (_: Exception) {
             ready = false
         }
@@ -53,11 +74,14 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
     override fun speak(text: String): Boolean {
         if (!ready || text.isBlank()) return false
         val localTts = tts ?: return false
-        executor.execute {
+        val currentGen = generation
+        synthExecutor.execute {
             try {
                 val generated = localTts.generate(text, 0, 1.0f)
                 val samples = generated.samples
                 if (samples.isEmpty()) return@execute
+                Log.d(tag, "TTS播报(text): $text")
+                Log.d(tag, "TTS播报(samples=${samples.size}, rate=${generated.sampleRate}, speechRate=$speechRate)")
 
                 val pcm = ShortArray(samples.size)
                 for (i in samples.indices) {
@@ -65,31 +89,9 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
                     pcm[i] = v.toShort()
                 }
 
-                val sampleRate = generated.sampleRate
-                val minBuffer = AudioTrack.getMinBufferSize(
-                    sampleRate,
-                    AudioFormat.CHANNEL_OUT_MONO,
-                    AudioFormat.ENCODING_PCM_16BIT
-                )
-
-                stop()
-                audioTrack = AudioTrack(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-                        .build(),
-                    AudioFormat.Builder()
-                        .setSampleRate(sampleRate)
-                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
-                        .build(),
-                    maxOf(minBuffer, pcm.size * 2),
-                    AudioTrack.MODE_STREAM,
-                    AudioManager.AUDIO_SESSION_ID_GENERATE
-                )
-                audioTrack?.play()
-                audioTrack?.write(pcm, 0, pcm.size)
-            } catch (_: Exception) {
+                playQueue.put(AudioSegment(pcm, generated.sampleRate, text, currentGen))
+            } catch (e: Exception) {
+                Log.e(tag, "TTS播放失败: ${e.message}", e)
             }
         }
         return true
@@ -97,7 +99,13 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
 
     override fun isReady(): Boolean = ready
 
+    override fun setSpeechRate(rate: Float) {
+        speechRate = rate.coerceIn(0.6f, 1.3f)
+    }
+
     override fun stop() {
+        generation += 1
+        playQueue.clear()
         try {
             audioTrack?.stop()
         } catch (_: Exception) {
@@ -108,10 +116,94 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
 
     override fun release() {
         stop()
+        running.set(false)
+        playerThread?.interrupt()
+        playerThread = null
         tts?.release()
         tts = null
         ready = false
-        executor.shutdownNow()
+        synthExecutor.shutdownNow()
+    }
+
+    private fun startPlayerLoop() {
+        playerThread = Thread({
+            while (running.get()) {
+                try {
+                    val segment = playQueue.take()
+                    if (segment.generation != generation) {
+                        continue
+                    }
+                    playSegment(segment)
+                } catch (_: InterruptedException) {
+                    break
+                } catch (e: Exception) {
+                    Log.e(tag, "Player loop error: ${e.message}", e)
+                }
+            }
+        }, "sherpa-tts-player").apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun playSegment(segment: AudioSegment) {
+        val minBuffer = AudioTrack.getMinBufferSize(
+            segment.sampleRate,
+            AudioFormat.CHANNEL_OUT_MONO,
+            AudioFormat.ENCODING_PCM_16BIT
+        )
+
+        val track = AudioTrack(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build(),
+            AudioFormat.Builder()
+                .setSampleRate(segment.sampleRate)
+                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                .build(),
+            maxOf(minBuffer, segment.pcm.size * 2),
+            AudioTrack.MODE_STREAM,
+            AudioManager.AUDIO_SESSION_ID_GENERATE
+        )
+        audioTrack = track
+        @Suppress("DEPRECATION")
+        track.setPlaybackRate(segment.sampleRate)
+        track.play()
+        track.write(segment.pcm, 0, segment.pcm.size)
+        waitForPlaybackComplete(track, segment.pcm.size)
+        try {
+            track.stop()
+        } catch (_: Exception) {
+        }
+        track.release()
+        if (audioTrack === track) {
+            audioTrack = null
+        }
+    }
+
+    private fun waitForPlaybackComplete(track: AudioTrack, totalFrames: Int) {
+        val startedAt = SystemClock.elapsedRealtime()
+        val expectedMs = ((totalFrames * 1000.0) / track.sampleRate).toLong().coerceAtLeast(1L)
+        val timeoutMs = expectedMs + 1200L
+        while (running.get() && track.playState == AudioTrack.PLAYSTATE_PLAYING) {
+            val played = track.playbackHeadPosition
+            if (played >= totalFrames) break
+            if (SystemClock.elapsedRealtime() - startedAt > timeoutMs) break
+            SystemClock.sleep(20)
+        }
+    }
+
+    private fun warmupSynthesis() {
+        val localTts = tts ?: return
+        synthExecutor.execute {
+            try {
+                localTts.generate("你好", 0, 1.0f)
+                Log.d(tag, "TTS静默预热完成")
+            } catch (e: Exception) {
+                Log.w(tag, "TTS静默预热失败: ${e.message}")
+            }
+        }
     }
 }
-

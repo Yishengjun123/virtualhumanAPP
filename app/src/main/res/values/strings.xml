@@ -19,4 +19,10 @@
     <string name="tts_not_ready">Sherpa TTS is not ready. Check model files under assets/sherpa/tts.</string>
     <string name="tts_speak_failed">TTS speak failed.</string>
     <string name="tts_initializing">Initializing Sherpa TTS model...</string>
+    <string name="ai_sent_toast">已发送给AI</string>
+    <string name="ai_waiting">AI思考中...</string>
+    <string name="ai_error">AI请求失败: %1$s</string>
+    <string name="ai_empty_reply">AI没有返回内容</string>
+    <string name="ai_not_configured">请先配置百炼AI的 AppId 和 ApiKey</string>
+    <string name="ai_request_in_progress">AI正在处理上一条请求</string>
 </resources>

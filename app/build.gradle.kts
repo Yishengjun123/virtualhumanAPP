@@ -17,6 +17,8 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "AI_APP_ID", "\"c5c16ddfba234c57b850accc878eaeb1\"")
+        buildConfigField("String", "AI_API_KEY", "\"sk-7626139b5ed14779a4329b6f73da5255\"")
     }
 
     buildTypes {
@@ -36,6 +38,7 @@ android {
         jvmTarget = "11"
     }
     buildFeatures {
+        buildConfig = true
         viewBinding = true
     }
     packaging {
@@ -72,4 +75,9 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    implementation(
+        group = "com.alibaba",
+        name = "dashscope-sdk-java",
+        version = "2.22.9"
+    )
 }
