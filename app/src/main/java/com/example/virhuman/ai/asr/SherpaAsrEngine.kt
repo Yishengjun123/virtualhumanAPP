@@ -17,8 +17,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class SherpaAsrEngine(
     private val context: Context,
-    private val callback: AsrEngine.Callback
+    initialCallback: AsrEngine.Callback
 ) : AsrEngine {
+    @Volatile
+    private var callback: AsrEngine.Callback = initialCallback
     private val sampleRate = 16000
     private val recording = AtomicBoolean(false)
     private var audioRecord: AudioRecord? = null
@@ -81,6 +83,10 @@ class SherpaAsrEngine(
     }
 
     override fun isAvailable(): Boolean = ready
+
+    fun updateCallback(newCallback: AsrEngine.Callback) {
+        callback = newCallback
+    }
 
     @RequiresPermission(Manifest.permission.RECORD_AUDIO)
     override fun startListening() {

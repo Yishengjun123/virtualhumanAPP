@@ -1,6 +1,10 @@
 <resources>
     <string name="app_name">VirHuman</string>
+    <string name="splash_title">VirHuman</string>
+    <string name="splash_loading">Initializing voice services...</string>
+    <string name="permission_audio_tip">Microphone permission is recommended for voice interaction.</string>
     <string name="login_title">Login</string>
+    <string name="device_code_label">Device Code: %1$s</string>
     <string name="main_title">Digital Human Main</string>
     <string name="input_account">Enter account</string>
     <string name="input_password">Enter password</string>
@@ -10,19 +14,23 @@
     <string name="stop_asr">Stop Speech Recognition</string>
     <string name="subtitle_hint">Recognition subtitle will show here</string>
     <string name="login_empty_error">Account or password cannot be empty</string>
+    <string name="login_invalid_account">账号密码有误</string>
+    <string name="login_no_device">无该设备信息</string>
+    <string name="login_request_failed">登录请求失败: %1$s</string>
     <string name="asr_error">Recognition failed: %1$s</string>
     <string name="asr_not_available">Sherpa STT is not ready. Check model files under assets/sherpa/stt.</string>
     <string name="asr_initializing">Initializing Sherpa STT model...</string>
     <string name="asr_stopped_toast">Recognition ended</string>
     <string name="start_tts_test">Test TTS</string>
-    <string name="tts_demo_text">&#20320;&#22909;&#65292;&#27426;&#36814;&#20351;&#29992;tts&#21151;&#33021;&#65292;&#29616;&#22312;&#26159;&#20108;&#38646;&#20108;&#20845;&#24180;&#65281;&#32487;&#32493;&#21152;&#27833;&#12290;</string>
+    <string name="show_device_info">Show Device Info</string>
+    <string name="tts_demo_text">Hello, welcome to the TTS feature. The year is 2026. Keep going.</string>
     <string name="tts_not_ready">Sherpa TTS is not ready. Check model files under assets/sherpa/tts.</string>
     <string name="tts_speak_failed">TTS speak failed.</string>
     <string name="tts_initializing">Initializing Sherpa TTS model...</string>
-    <string name="ai_sent_toast">已发送给AI</string>
-    <string name="ai_waiting">AI思考中...</string>
-    <string name="ai_error">AI请求失败: %1$s</string>
-    <string name="ai_empty_reply">AI没有返回内容</string>
-    <string name="ai_not_configured">请先配置百炼AI的 AppId 和 ApiKey</string>
-    <string name="ai_request_in_progress">AI正在处理上一条请求</string>
+    <string name="ai_sent_toast">Sent to AI</string>
+    <string name="ai_waiting">AI is thinking...</string>
+    <string name="ai_error">AI request failed: %1$s</string>
+    <string name="ai_empty_reply">AI returned empty text</string>
+    <string name="ai_not_configured">Please configure DashScope AppId and ApiKey first</string>
+    <string name="ai_request_in_progress">AI is still processing the previous request</string>
 </resources>

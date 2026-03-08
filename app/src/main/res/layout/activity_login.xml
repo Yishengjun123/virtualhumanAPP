@@ -2,13 +2,21 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center_horizontal"
+    android:gravity="top|center_horizontal"
     android:orientation="vertical"
     android:padding="24dp">
 
     <TextView
+        android:id="@+id/tvDeviceCode"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:text="@string/device_code_label"
+        android:textSize="13sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:text="@string/login_title"
         android:textSize="24sp"
         android:textStyle="bold" />
@@ -42,4 +50,3 @@
         android:layout_marginTop="12dp"
         android:text="@string/login_now" />
 </LinearLayout>
-

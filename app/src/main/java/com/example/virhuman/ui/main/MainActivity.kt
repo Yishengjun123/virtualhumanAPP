@@ -2,7 +2,10 @@
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -13,10 +16,12 @@ import com.example.virhuman.R
 import com.example.virhuman.ai.ali.AiSession
 import com.example.virhuman.ai.ali.DashScopeManager
 import com.example.virhuman.ai.asr.AsrEngine
-import com.example.virhuman.ai.asr.SherpaAsrEngine
+import com.example.virhuman.ai.asr.GlobalAsrManager
 import com.example.virhuman.ai.tts.SherpaTtsEngine
 import com.example.virhuman.ai.tts.TtsEngine
 import com.example.virhuman.databinding.ActivityMainBinding
+import com.example.virhuman.video.DigitalHumanState
+import com.example.virhuman.video.DigitalHumanVideoPlayer
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity(), AsrEngine.Callback {
@@ -25,6 +30,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private lateinit var binding: ActivityMainBinding
     private var asrEngine: AsrEngine? = null
     private var ttsEngine: TtsEngine? = null
+    private lateinit var videoPlayer: DigitalHumanVideoPlayer
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var currentState: DigitalHumanState? = null
     private var isListening = false
     @Volatile private var asrInitializing = false
     @Volatile private var ttsInitializing = false
@@ -35,6 +43,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        videoPlayer = DigitalHumanVideoPlayer(this)
+        videoPlayer.bind(binding.playerView)
+        switchState(DigitalHumanState.LEISURE)
         DashScopeManager.updateCredentials(BuildConfig.AI_APP_ID, BuildConfig.AI_API_KEY)
         warmupEngines()
 
@@ -43,6 +54,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 asrEngine?.stopListening()
                 isListening = false
                 binding.btnStartListen.setText(R.string.start_asr)
+                if (!aiRequesting) {
+                    switchState(DigitalHumanState.LEISURE)
+                }
                 return@setOnClickListener
             }
             ensureAudioPermission {
@@ -52,6 +66,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                         return@ensureAsrReady
                     }
                     binding.tvSubtitle.text = ""
+                    switchState(DigitalHumanState.LISTENING)
                     engine.startListening()
                     isListening = true
                     binding.btnStartListen.setText(R.string.stop_asr)
@@ -70,6 +85,13 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                     binding.tvSubtitle.setText(R.string.tts_speak_failed)
                 }
             }
+        }
+
+        binding.btnDeviceInfo.setOnClickListener {
+            val model = Build.MODEL
+            val deviceCode = Build.DEVICE
+            Log.d(tag, "DeviceInfo model=$model, deviceCode=$deviceCode")
+            Toast.makeText(this, "model=$model, device=$deviceCode", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -97,6 +119,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             isListening = false
             binding.btnStartListen.setText(R.string.start_asr)
         }
+        switchState(DigitalHumanState.LISTENING)
         sendToAi(text)
     }
 
@@ -105,6 +128,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             binding.tvSubtitle.text = getString(R.string.asr_error, message)
             isListening = false
             binding.btnStartListen.setText(R.string.start_asr)
+            if (!aiRequesting) {
+                switchState(DigitalHumanState.LEISURE)
+            }
         }
     }
 
@@ -113,14 +139,19 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             isListening = false
             binding.btnStartListen.setText(R.string.start_asr)
             Toast.makeText(this, R.string.asr_stopped_toast, Toast.LENGTH_SHORT).show()
+            if (!aiRequesting) {
+                switchState(DigitalHumanState.LEISURE)
+            }
         }
     }
 
     override fun onDestroy() {
         super.onDestroy()
         DashScopeManager.cancelCurrentStreaming()
-        asrEngine?.release()
+        asrEngine?.stopListening()
+        GlobalAsrManager.detachCallback()
         asrEngine = null
+        videoPlayer.release()
         ttsEngine?.release()
         ttsEngine = null
     }
@@ -147,6 +178,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             Toast.makeText(this, R.string.ai_sent_toast, Toast.LENGTH_SHORT).show()
             binding.tvSubtitle.setText(R.string.ai_waiting)
         }
+        switchState(DigitalHumanState.LISTENING)
 
         var mergedText = ""
         spokenCursor = 0
@@ -178,6 +210,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 }
                 Log.d(tag, "AI回复(final): $finalReply")
                 speakReadySentences(finalReply, flushTail = true)
+                if (finalReply.isBlank()) {
+                    switchState(DigitalHumanState.LEISURE)
+                }
             },
             onError = { message ->
                 aiRequesting = false
@@ -185,6 +220,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 runOnUiThread {
                     binding.tvSubtitle.text = getString(R.string.ai_error, message)
                 }
+                switchState(DigitalHumanState.LEISURE)
                 ensureTtsReady(showHint = false) { engine ->
                     engine?.stop()
                 }
@@ -217,6 +253,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         spokenCursor = end
         if (segment.isEmpty()) return
         Log.d(tag, "TTS播报(segment): $segment")
+        switchState(DigitalHumanState.SPEAKING)
         ensureTtsReady(showHint = false) { engine ->
             engine?.speak(segment)
         }
@@ -246,11 +283,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         asrInitializing = true
         if (showHint) binding.tvSubtitle.setText(R.string.asr_initializing)
         thread(start = true, name = "asr-init") {
-            val engine = try {
-                SherpaAsrEngine(this, this)
-            } catch (_: Throwable) {
-                null
-            }
+            val engine = GlobalAsrManager.acquire(applicationContext, this)
             asrEngine = engine
             asrInitializing = false
             runOnUiThread { onReady(engine) }
@@ -272,6 +305,13 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             } catch (_: Throwable) {
                 null
             }
+            engine?.setOnIdleListener {
+                mainHandler.postDelayed({
+                    if (!isListening && !aiRequesting) {
+                        switchState(DigitalHumanState.LEISURE)
+                    }
+                }, 120L)
+            }
             ttsEngine = engine
             ttsInitializing = false
             runOnUiThread { onReady(engine) }
@@ -282,6 +322,16 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         // Preload in background to reduce first-click latency.
         ensureAsrReady(showHint = false) {}
         ensureTtsReady(showHint = false) {}
+    }
+
+    private fun switchState(state: DigitalHumanState) {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            if (state == currentState) return
+            currentState = state
+            videoPlayer.setState(state)
+            return
+        }
+        mainHandler.post { switchState(state) }
     }
 }
 

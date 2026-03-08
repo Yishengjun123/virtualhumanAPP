@@ -26,6 +26,8 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
     private var ready = false
     @Volatile private var speechRate = 1.0f
     @Volatile private var generation = 0
+    @Volatile private var released = false
+    @Volatile private var onIdleListener: (() -> Unit)? = null
 
     private data class AudioSegment(
         val pcm: ShortArray,
@@ -64,18 +66,17 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
             tts = OfflineTts(context.assets, config)
             ready = true
             startPlayerLoop()
-            // Warm up model to reduce first real-sentence latency (no playback).
-            warmupSynthesis()
         } catch (_: Exception) {
             ready = false
         }
     }
 
     override fun speak(text: String): Boolean {
-        if (!ready || text.isBlank()) return false
+        if (!ready || released || text.isBlank()) return false
         val localTts = tts ?: return false
         val currentGen = generation
         synthExecutor.execute {
+            if (released) return@execute
             try {
                 val generated = localTts.generate(text, 0, 1.0f)
                 val samples = generated.samples
@@ -103,6 +104,10 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
         speechRate = rate.coerceIn(0.6f, 1.3f)
     }
 
+    override fun setOnIdleListener(listener: (() -> Unit)?) {
+        onIdleListener = listener
+    }
+
     override fun stop() {
         generation += 1
         playQueue.clear()
@@ -112,9 +117,11 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
         }
         audioTrack?.release()
         audioTrack = null
+        onIdleListener?.invoke()
     }
 
     override fun release() {
+        released = true
         stop()
         running.set(false)
         playerThread?.interrupt()
@@ -134,6 +141,9 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
                         continue
                     }
                     playSegment(segment)
+                    if (playQueue.isEmpty()) {
+                        onIdleListener?.invoke()
+                    }
                 } catch (_: InterruptedException) {
                     break
                 } catch (e: Exception) {
@@ -192,18 +202,6 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
             if (played >= totalFrames) break
             if (SystemClock.elapsedRealtime() - startedAt > timeoutMs) break
             SystemClock.sleep(20)
-        }
-    }
-
-    private fun warmupSynthesis() {
-        val localTts = tts ?: return
-        synthExecutor.execute {
-            try {
-                localTts.generate("你好", 0, 1.0f)
-                Log.d(tag, "TTS静默预热完成")
-            } catch (e: Exception) {
-                Log.w(tag, "TTS静默预热失败: ${e.message}")
-            }
         }
     }
 }

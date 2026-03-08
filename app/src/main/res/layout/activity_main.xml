@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:gravity="center_horizontal"
@@ -13,11 +14,21 @@
         android:textSize="24sp"
         android:textStyle="bold" />
 
+    <com.google.android.exoplayer2.ui.PlayerView
+        android:id="@+id/playerView"
+        android:layout_width="match_parent"
+        android:layout_height="220dp"
+        android:layout_marginTop="12dp"
+        android:background="#000000"
+        app:resize_mode="fit"
+        app:show_buffering="never"
+        app:use_controller="false" />
+
     <Button
         android:id="@+id/btnStartListen"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="16dp"
         android:text="@string/start_asr" />
 
     <Button
@@ -26,6 +37,13 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:text="@string/start_tts_test" />
+
+    <Button
+        android:id="@+id/btnDeviceInfo"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="@string/show_device_info" />
 
     <TextView
         android:id="@+id/tvSubtitle"
