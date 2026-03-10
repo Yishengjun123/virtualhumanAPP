@@ -9,6 +9,7 @@ object MMKVHelper {
     private const val KEY_PASSWORD = "password"
     private const val KEY_REMEMBER = "remember"
     private const val KEY_DEVICE_CODE = "device_code"
+    private const val KEY_FACE_DETECT = "face_detect"
 
     fun saveAccount(account: String, password: String, remember: Boolean) {
         mmkv.encode(KEY_ACCOUNT, account)
@@ -31,4 +32,10 @@ object MMKVHelper {
     }
 
     fun getDeviceCode(): String = mmkv.decodeString(KEY_DEVICE_CODE, "").orEmpty()
+
+    fun setFaceDetectEnabled(enabled: Boolean) {
+        mmkv.encode(KEY_FACE_DETECT, enabled)
+    }
+
+    fun isFaceDetectEnabled(): Boolean = mmkv.decodeBool(KEY_FACE_DETECT, false)
 }

@@ -5,55 +5,34 @@
     android:layout_height="match_parent"
     android:background="#000000">
 
-    <com.google.android.exoplayer2.ui.PlayerView
-        android:id="@+id/playerView"
+    <FrameLayout
+        android:id="@+id/videoLayer"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        app:resize_mode="zoom"
-        app:show_buffering="never"
-        app:use_controller="false" />
+        android:layout_height="match_parent">
 
-    <View
-        android:id="@+id/videoMask"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:alpha="0"
-        android:background="#FF000000"
-        android:clickable="false"
-        android:focusable="false"
-        android:visibility="gone" />
+        <com.google.android.exoplayer2.ui.PlayerView
+            android:id="@+id/playerViewBack"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:resize_mode="zoom"
+            app:show_buffering="never"
+            app:surface_type="texture_view"
+            app:use_controller="false" />
+
+        <com.google.android.exoplayer2.ui.PlayerView
+            android:id="@+id/playerViewFront"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            app:resize_mode="zoom"
+            app:show_buffering="never"
+            app:surface_type="texture_view"
+            app:use_controller="false" />
+    </FrameLayout>
 
     <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="16dp">
-
-        <TextView
-            android:id="@+id/tvMainTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:background="#66000000"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="6dp"
-            android:text="@string/main_title"
-            android:textColor="#FFFFFF"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
-
-        <TextView
-            android:id="@+id/tvDeviceCodeOverlay"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:background="#66000000"
-            android:paddingHorizontal="10dp"
-            android:paddingVertical="6dp"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/tvMainTitle" />
 
         <androidx.constraintlayout.widget.Guideline
             android:id="@+id/chatTopGuide"
@@ -116,7 +95,7 @@
                 android:layout_height="62dp"
                 android:layout_marginBottom="10dp"
                 android:background="@drawable/bg_circle_action"
-                android:text="@string/start_tts_short"
+                android:text="@string/settings_short"
                 android:textColor="#FFFFFF"
                 android:textSize="12sp" />
 

@@ -15,6 +15,7 @@
     <string name="start_asr_short">STT</string>
     <string name="stop_asr_short">STOP</string>
     <string name="start_tts_short">TTS</string>
+    <string name="settings_short">SET</string>
     <string name="show_device_short">DEV</string>
     <string name="subtitle_hint">Recognition subtitle will show here</string>
     <string name="login_empty_error">Account or password cannot be empty</string>
@@ -37,4 +38,12 @@
     <string name="ai_empty_reply">AI returned empty text</string>
     <string name="ai_not_configured">Please configure DashScope AppId and ApiKey first</string>
     <string name="ai_request_in_progress">AI is still processing the previous request</string>
+    <string name="settings_title">Settings</string>
+    <string name="settings_back">Back</string>
+    <string name="current_version_label">Current Version: %1$s</string>
+    <string name="check_update">Check Update</string>
+    <string name="face_detect_toggle">Face Detection</string>
+    <string name="relogin">Re-login</string>
+    <string name="exit_app">Exit App</string>
+    <string name="already_latest">Already latest version</string>
 </resources>

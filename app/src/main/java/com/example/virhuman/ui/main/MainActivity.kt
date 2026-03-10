@@ -1,6 +1,7 @@
 ﻿package com.example.virhuman.ui.main
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -23,8 +24,8 @@ import com.example.virhuman.ai.asr.AsrEngine
 import com.example.virhuman.ai.asr.GlobalAsrManager
 import com.example.virhuman.ai.tts.SherpaTtsEngine
 import com.example.virhuman.ai.tts.TtsEngine
-import com.example.virhuman.data.MMKVHelper
 import com.example.virhuman.databinding.ActivityMainBinding
+import com.example.virhuman.ui.settings.SettingsActivity
 import com.example.virhuman.video.DigitalHumanState
 import com.example.virhuman.video.DigitalHumanVideoPlayer
 import kotlin.concurrent.thread
@@ -53,12 +54,10 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         videoPlayer = DigitalHumanVideoPlayer(this)
-        videoPlayer.bind(binding.playerView, binding.videoMask)
+        videoPlayer.bind(binding.playerViewFront, binding.playerViewBack)
         switchState(DigitalHumanState.LEISURE)
         DashScopeManager.updateCredentials(BuildConfig.AI_APP_ID, BuildConfig.AI_API_KEY)
         warmupEngines()
-        val deviceCode = MMKVHelper.getDeviceCode().ifBlank { Build.DEVICE }
-        binding.tvDeviceCodeOverlay.text = getString(R.string.device_code_label, deviceCode)
 
         binding.btnStartListen.setOnClickListener {
             if (isListening) {
@@ -90,16 +89,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         }
 
         binding.btnTtsTest.setOnClickListener {
-            ensureTtsReady { engine ->
-                if (engine == null || !engine.isReady()) {
-                    Toast.makeText(this, R.string.tts_not_ready, Toast.LENGTH_SHORT).show()
-                    return@ensureTtsReady
-                }
-                val success = engine.speak(getString(R.string.tts_demo_text))
-                if (!success) {
-                    Toast.makeText(this, R.string.tts_speak_failed, Toast.LENGTH_SHORT).show()
-                }
-            }
+            startActivity(Intent(this, SettingsActivity::class.java))
         }
 
         binding.btnDeviceInfo.setOnClickListener {
