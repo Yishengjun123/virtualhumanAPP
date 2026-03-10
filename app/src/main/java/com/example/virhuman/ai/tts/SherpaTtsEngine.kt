@@ -1,4 +1,4 @@
-package com.example.virhuman.ai.tts
+﻿package com.example.virhuman.ai.tts
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -14,6 +14,7 @@ import com.k2fsa.sherpa.onnx.OfflineTtsVitsModelConfig
 import java.util.concurrent.Executors
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 class SherpaTtsEngine(context: Context) : TtsEngine {
     private val tag = "SherpaTts"
@@ -22,12 +23,21 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
     private val synthExecutor = Executors.newSingleThreadExecutor()
     private val playQueue = LinkedBlockingQueue<AudioSegment>()
     private val running = AtomicBoolean(true)
+    private val playing = AtomicBoolean(false)
+    private val pendingSynthCount = AtomicInteger(0)
     private var playerThread: Thread? = null
     private var ready = false
-    @Volatile private var speechRate = 1.0f
-    @Volatile private var generation = 0
-    @Volatile private var released = false
-    @Volatile private var onIdleListener: (() -> Unit)? = null
+    @Volatile
+    private var speechRate = 1.0f
+
+    @Volatile
+    private var generation = 0
+
+    @Volatile
+    private var released = false
+
+    @Volatile
+    private var onIdleListener: (() -> Unit)? = null
 
     private data class AudioSegment(
         val pcm: ShortArray,
@@ -75,14 +85,21 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
         if (!ready || released || text.isBlank()) return false
         val localTts = tts ?: return false
         val currentGen = generation
+        pendingSynthCount.incrementAndGet()
         synthExecutor.execute {
-            if (released) return@execute
+            if (released) {
+                pendingSynthCount.decrementAndGet()
+                return@execute
+            }
             try {
                 val generated = localTts.generate(text, 0, 1.0f)
                 val samples = generated.samples
                 if (samples.isEmpty()) return@execute
                 Log.d(tag, "TTS播报(text): $text")
-                Log.d(tag, "TTS播报(samples=${samples.size}, rate=${generated.sampleRate}, speechRate=$speechRate)")
+                Log.d(
+                    tag,
+                    "TTS播报(samples=${samples.size}, rate=${generated.sampleRate}, speechRate=$speechRate)"
+                )
 
                 val pcm = ShortArray(samples.size)
                 for (i in samples.indices) {
@@ -93,6 +110,9 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
                 playQueue.put(AudioSegment(pcm, generated.sampleRate, text, currentGen))
             } catch (e: Exception) {
                 Log.e(tag, "TTS播放失败: ${e.message}", e)
+            } finally {
+                pendingSynthCount.decrementAndGet()
+                maybeNotifyIdle()
             }
         }
         return true
@@ -111,12 +131,14 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
     override fun stop() {
         generation += 1
         playQueue.clear()
+        pendingSynthCount.set(0)
         try {
             audioTrack?.stop()
         } catch (_: Exception) {
         }
         audioTrack?.release()
         audioTrack = null
+        playing.set(false)
         onIdleListener?.invoke()
     }
 
@@ -138,12 +160,11 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
                 try {
                     val segment = playQueue.take()
                     if (segment.generation != generation) {
+                        maybeNotifyIdle()
                         continue
                     }
                     playSegment(segment)
-                    if (playQueue.isEmpty()) {
-                        onIdleListener?.invoke()
-                    }
+                    maybeNotifyIdle()
                 } catch (_: InterruptedException) {
                     break
                 } catch (e: Exception) {
@@ -157,6 +178,7 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
     }
 
     private fun playSegment(segment: AudioSegment) {
+        playing.set(true)
         val minBuffer = AudioTrack.getMinBufferSize(
             segment.sampleRate,
             AudioFormat.CHANNEL_OUT_MONO,
@@ -191,6 +213,7 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
         if (audioTrack === track) {
             audioTrack = null
         }
+        playing.set(false)
     }
 
     private fun waitForPlaybackComplete(track: AudioTrack, totalFrames: Int) {
@@ -203,5 +226,14 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
             if (SystemClock.elapsedRealtime() - startedAt > timeoutMs) break
             SystemClock.sleep(20)
         }
+    }
+
+    private fun maybeNotifyIdle() {
+        if (released) return
+        if (!running.get()) return
+        if (playing.get()) return
+        if (pendingSynthCount.get() > 0) return
+        if (playQueue.isNotEmpty()) return
+        onIdleListener?.invoke()
     }
 }

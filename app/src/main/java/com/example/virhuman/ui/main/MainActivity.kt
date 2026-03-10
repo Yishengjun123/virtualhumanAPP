@@ -7,6 +7,10 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.Gravity
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -19,6 +23,7 @@ import com.example.virhuman.ai.asr.AsrEngine
 import com.example.virhuman.ai.asr.GlobalAsrManager
 import com.example.virhuman.ai.tts.SherpaTtsEngine
 import com.example.virhuman.ai.tts.TtsEngine
+import com.example.virhuman.data.MMKVHelper
 import com.example.virhuman.databinding.ActivityMainBinding
 import com.example.virhuman.video.DigitalHumanState
 import com.example.virhuman.video.DigitalHumanVideoPlayer
@@ -37,23 +42,31 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     @Volatile private var asrInitializing = false
     @Volatile private var ttsInitializing = false
     @Volatile private var aiRequesting = false
+    @Volatile private var isFinalizingToAi = false
+    @Volatile private var awaitingAsrFinal = false
     @Volatile private var spokenCursor = 0
+    private var aiBubbleView: TextView? = null
+    private var userBubbleView: TextView? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         videoPlayer = DigitalHumanVideoPlayer(this)
-        videoPlayer.bind(binding.playerView)
+        videoPlayer.bind(binding.playerView, binding.videoMask)
         switchState(DigitalHumanState.LEISURE)
         DashScopeManager.updateCredentials(BuildConfig.AI_APP_ID, BuildConfig.AI_API_KEY)
         warmupEngines()
+        val deviceCode = MMKVHelper.getDeviceCode().ifBlank { Build.DEVICE }
+        binding.tvDeviceCodeOverlay.text = getString(R.string.device_code_label, deviceCode)
 
         binding.btnStartListen.setOnClickListener {
             if (isListening) {
+                awaitingAsrFinal = false
                 asrEngine?.stopListening()
                 isListening = false
-                binding.btnStartListen.setText(R.string.start_asr)
+                isFinalizingToAi = false
+                binding.btnStartListen.setText(R.string.start_asr_short)
                 if (!aiRequesting) {
                     switchState(DigitalHumanState.LEISURE)
                 }
@@ -62,14 +75,16 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             ensureAudioPermission {
                 ensureAsrReady { engine ->
                     if (engine == null || !engine.isAvailable()) {
-                        binding.tvSubtitle.setText(R.string.asr_not_available)
+                        Toast.makeText(this, R.string.asr_not_available, Toast.LENGTH_SHORT).show()
                         return@ensureAsrReady
                     }
-                    binding.tvSubtitle.text = ""
+                    prepareLiveUserBubble()
                     switchState(DigitalHumanState.LISTENING)
+                    isFinalizingToAi = false
+                    awaitingAsrFinal = true
                     engine.startListening()
                     isListening = true
-                    binding.btnStartListen.setText(R.string.stop_asr)
+                    binding.btnStartListen.setText(R.string.stop_asr_short)
                 }
             }
         }
@@ -77,12 +92,12 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         binding.btnTtsTest.setOnClickListener {
             ensureTtsReady { engine ->
                 if (engine == null || !engine.isReady()) {
-                    binding.tvSubtitle.setText(R.string.tts_not_ready)
+                    Toast.makeText(this, R.string.tts_not_ready, Toast.LENGTH_SHORT).show()
                     return@ensureTtsReady
                 }
                 val success = engine.speak(getString(R.string.tts_demo_text))
                 if (!success) {
-                    binding.tvSubtitle.setText(R.string.tts_speak_failed)
+                    Toast.makeText(this, R.string.tts_speak_failed, Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -109,26 +124,32 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
 
     override fun onPartialResult(text: String) {
         runOnUiThread {
-            binding.tvSubtitle.text = text
+            updateLiveUserBubble(text)
         }
     }
 
     override fun onFinalResult(text: String) {
+        awaitingAsrFinal = false
+        isFinalizingToAi = true
         runOnUiThread {
-            binding.tvSubtitle.text = text
+            updateLiveUserBubble(text)
+            userBubbleView = null
             isListening = false
-            binding.btnStartListen.setText(R.string.start_asr)
+            binding.btnStartListen.setText(R.string.start_asr_short)
         }
         switchState(DigitalHumanState.LISTENING)
         sendToAi(text)
     }
 
     override fun onError(message: String) {
+        awaitingAsrFinal = false
+        isFinalizingToAi = false
         runOnUiThread {
-            binding.tvSubtitle.text = getString(R.string.asr_error, message)
+            userBubbleView = null
+            Toast.makeText(this, getString(R.string.asr_error, message), Toast.LENGTH_SHORT).show()
             isListening = false
-            binding.btnStartListen.setText(R.string.start_asr)
-            if (!aiRequesting) {
+            binding.btnStartListen.setText(R.string.start_asr_short)
+            if (!aiRequesting && !isFinalizingToAi) {
                 switchState(DigitalHumanState.LEISURE)
             }
         }
@@ -137,9 +158,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     override fun onStopped() {
         runOnUiThread {
             isListening = false
-            binding.btnStartListen.setText(R.string.start_asr)
+            binding.btnStartListen.setText(R.string.start_asr_short)
             Toast.makeText(this, R.string.asr_stopped_toast, Toast.LENGTH_SHORT).show()
-            if (!aiRequesting) {
+            if (!aiRequesting && !isFinalizingToAi && !awaitingAsrFinal) {
                 switchState(DigitalHumanState.LEISURE)
             }
         }
@@ -147,6 +168,8 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
 
     override fun onDestroy() {
         super.onDestroy()
+        awaitingAsrFinal = false
+        isFinalizingToAi = false
         DashScopeManager.cancelCurrentStreaming()
         asrEngine?.stopListening()
         GlobalAsrManager.detachCallback()
@@ -161,7 +184,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         if (prompt.isBlank()) return
         if (!DashScopeManager.isConfigured()) {
             runOnUiThread {
-                binding.tvSubtitle.setText(R.string.ai_not_configured)
+                Toast.makeText(this, R.string.ai_not_configured, Toast.LENGTH_SHORT).show()
             }
             return
         }
@@ -176,11 +199,11 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         AiSession.updateSessionId()
         runOnUiThread {
             Toast.makeText(this, R.string.ai_sent_toast, Toast.LENGTH_SHORT).show()
-            binding.tvSubtitle.setText(R.string.ai_waiting)
         }
         switchState(DigitalHumanState.LISTENING)
 
         var mergedText = ""
+        aiBubbleView = null
         spokenCursor = 0
         ensureTtsReady(showHint = false) { engine ->
             engine?.stop()
@@ -192,7 +215,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 mergedText = mergeStreamText(mergedText, chunk)
                 Log.d(tag, "AI回复(merged): $mergedText")
                 runOnUiThread {
-                    binding.tvSubtitle.text = mergedText
+                    updateAiBubble(mergedText)
                 }
                 speakReadySentences(mergedText, flushTail = false)
             },
@@ -200,25 +223,28 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 aiRequesting = false
                 val finalReply = mergedText.trim()
                 if (finalReply.isBlank()) {
+                    isFinalizingToAi = false
                     runOnUiThread {
-                        binding.tvSubtitle.setText(R.string.ai_empty_reply)
+                        Toast.makeText(this, R.string.ai_empty_reply, Toast.LENGTH_SHORT).show()
                     }
                     return@streamCall
                 }
                 runOnUiThread {
-                    binding.tvSubtitle.text = finalReply
+                    updateAiBubble(finalReply)
                 }
                 Log.d(tag, "AI回复(final): $finalReply")
                 speakReadySentences(finalReply, flushTail = true)
                 if (finalReply.isBlank()) {
                     switchState(DigitalHumanState.LEISURE)
                 }
+                isFinalizingToAi = false
             },
             onError = { message ->
                 aiRequesting = false
+                isFinalizingToAi = false
                 Log.e(tag, "AI请求失败: $message")
                 runOnUiThread {
-                    binding.tvSubtitle.text = getString(R.string.ai_error, message)
+                    Toast.makeText(this, getString(R.string.ai_error, message), Toast.LENGTH_SHORT).show()
                 }
                 switchState(DigitalHumanState.LEISURE)
                 ensureTtsReady(showHint = false) { engine ->
@@ -281,7 +307,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         }
         if (asrInitializing) return
         asrInitializing = true
-        if (showHint) binding.tvSubtitle.setText(R.string.asr_initializing)
+        if (showHint) Toast.makeText(this, R.string.asr_initializing, Toast.LENGTH_SHORT).show()
         thread(start = true, name = "asr-init") {
             val engine = GlobalAsrManager.acquire(applicationContext, this)
             asrEngine = engine
@@ -298,7 +324,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         }
         if (ttsInitializing) return
         ttsInitializing = true
-        if (showHint) binding.tvSubtitle.setText(R.string.tts_initializing)
+        if (showHint) Toast.makeText(this, R.string.tts_initializing, Toast.LENGTH_SHORT).show()
         thread(start = true, name = "tts-init") {
             val engine = try {
                 SherpaTtsEngine(this)
@@ -332,6 +358,77 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             return
         }
         mainHandler.post { switchState(state) }
+    }
+
+    private fun ensureChatVisible() {
+        if (binding.chatPanel.visibility != View.VISIBLE) binding.chatPanel.visibility = View.VISIBLE
+    }
+
+    private fun prepareLiveUserBubble() {
+        ensureChatVisible()
+        aiBubbleView = null
+        val bubble = buildBubble("", false)
+        binding.chatContainer.addView(bubble)
+        userBubbleView = bubble
+        scrollChatToBottom()
+    }
+
+    private fun updateLiveUserBubble(text: String) {
+        val message = text.trim()
+        if (message.isEmpty()) return
+        val lastView = binding.chatContainer.getChildAt(binding.chatContainer.childCount - 1) as? TextView
+        if (userBubbleView == null && lastView != null && lastView.text.toString() == message) {
+            userBubbleView = lastView
+            return
+        }
+        val bubble = userBubbleView ?: run {
+            val created = buildBubble("", false)
+            binding.chatContainer.addView(created)
+            userBubbleView = created
+            created
+        }
+        bubble.text = message
+        scrollChatToBottom()
+    }
+
+    private fun updateAiBubble(text: String) {
+        val message = text.trim()
+        if (message.isEmpty()) return
+        ensureChatVisible()
+        val bubble = aiBubbleView ?: buildBubble("", true).also {
+            aiBubbleView = it
+            binding.chatContainer.addView(it)
+        }
+        bubble.text = message
+        scrollChatToBottom()
+    }
+
+    private fun buildBubble(text: String, isAi: Boolean): TextView {
+        val view = TextView(this)
+        val maxWidth = (resources.displayMetrics.widthPixels * 0.62f).toInt()
+        view.maxWidth = maxWidth
+        view.text = text
+        view.setTextColor(0xFFFFFFFF.toInt())
+        view.textSize = 16f
+        view.setPadding(18, 12, 18, 12)
+        view.background = ContextCompat.getDrawable(
+            this,
+            if (isAi) R.drawable.bg_bubble_ai else R.drawable.bg_bubble_user
+        )
+        val params = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        )
+        params.gravity = if (isAi) Gravity.END else Gravity.START
+        params.topMargin = 8
+        view.layoutParams = params
+        return view
+    }
+
+    private fun scrollChatToBottom() {
+        binding.svChat.post {
+            binding.svChat.fullScroll(View.FOCUS_DOWN)
+        }
     }
 }
 

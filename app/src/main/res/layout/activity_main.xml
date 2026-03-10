@@ -1,58 +1,135 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center_horizontal"
-    android:orientation="vertical"
-    android:padding="24dp">
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/main_title"
-        android:textSize="24sp"
-        android:textStyle="bold" />
+    android:background="#000000">
 
     <com.google.android.exoplayer2.ui.PlayerView
         android:id="@+id/playerView"
         android:layout_width="match_parent"
-        android:layout_height="220dp"
-        android:layout_marginTop="12dp"
-        android:background="#000000"
-        app:resize_mode="fit"
+        android:layout_height="match_parent"
+        app:resize_mode="zoom"
         app:show_buffering="never"
         app:use_controller="false" />
 
-    <Button
-        android:id="@+id/btnStartListen"
+    <View
+        android:id="@+id/videoMask"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="@string/start_asr" />
+        android:layout_height="match_parent"
+        android:alpha="0"
+        android:background="#FF000000"
+        android:clickable="false"
+        android:focusable="false"
+        android:visibility="gone" />
 
-    <Button
-        android:id="@+id/btnTtsTest"
+    <androidx.constraintlayout.widget.ConstraintLayout
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="@string/start_tts_test" />
+        android:layout_height="match_parent"
+        android:padding="16dp">
 
-    <Button
-        android:id="@+id/btnDeviceInfo"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:text="@string/show_device_info" />
+        <TextView
+            android:id="@+id/tvMainTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#66000000"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp"
+            android:text="@string/main_title"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
-    <TextView
-        android:id="@+id/tvSubtitle"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:background="#EFEFEF"
-        android:minHeight="140dp"
-        android:padding="12dp"
-        android:text="@string/subtitle_hint"
-        android:textSize="18sp" />
-</LinearLayout>
+        <TextView
+            android:id="@+id/tvDeviceCodeOverlay"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="#66000000"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="6dp"
+            android:textColor="#FFFFFF"
+            android:textSize="13sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/tvMainTitle" />
+
+        <androidx.constraintlayout.widget.Guideline
+            android:id="@+id/chatTopGuide"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            app:layout_constraintGuide_percent="0.65" />
+
+        <FrameLayout
+            android:id="@+id/chatPanel"
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="12dp"
+            android:background="#00000000"
+            android:padding="6dp"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/rightButtonGroup"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="@id/chatTopGuide">
+
+            <ScrollView
+                android:id="@+id/svChat"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:fillViewport="true"
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/chatContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+            </ScrollView>
+        </FrameLayout>
+
+        <LinearLayout
+            android:id="@+id/rightButtonGroup"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:gravity="center_horizontal"
+            android:orientation="vertical"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <Button
+                android:id="@+id/btnStartListen"
+                android:layout_width="62dp"
+                android:layout_height="62dp"
+                android:layout_marginBottom="10dp"
+                android:background="@drawable/bg_circle_action"
+                android:text="@string/start_asr_short"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnTtsTest"
+                android:layout_width="62dp"
+                android:layout_height="62dp"
+                android:layout_marginBottom="10dp"
+                android:background="@drawable/bg_circle_action"
+                android:text="@string/start_tts_short"
+                android:textColor="#FFFFFF"
+                android:textSize="12sp" />
+
+            <Button
+                android:id="@+id/btnDeviceInfo"
+                android:layout_width="62dp"
+                android:layout_height="62dp"
+                android:background="@drawable/bg_circle_action"
+                android:text="@string/show_device_short"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</FrameLayout>
