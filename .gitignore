@@ -17,3 +17,7 @@ models/
 _tmp_sherpa_onnx/
 *.onnx
 *.tar.bz2
+AGENTS.md
+PROJECT_MEMORY.md
+PROJECT-MEMORY.md
+logcat.txt

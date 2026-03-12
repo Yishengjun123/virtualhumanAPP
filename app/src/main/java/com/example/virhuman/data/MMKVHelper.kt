@@ -1,4 +1,4 @@
-package com.example.virhuman.data
+﻿package com.example.virhuman.data
 
 import com.tencent.mmkv.MMKV
 
@@ -10,6 +10,8 @@ object MMKVHelper {
     private const val KEY_REMEMBER = "remember"
     private const val KEY_DEVICE_CODE = "device_code"
     private const val KEY_FACE_DETECT = "face_detect"
+    private const val KEY_FACE_AUTO_DIALOG = "face_auto_dialog"
+    private const val KEY_FACE_AUTO_GREET = "face_auto_greet"
 
     fun saveAccount(account: String, password: String, remember: Boolean) {
         mmkv.encode(KEY_ACCOUNT, account)
@@ -38,4 +40,22 @@ object MMKVHelper {
     }
 
     fun isFaceDetectEnabled(): Boolean = mmkv.decodeBool(KEY_FACE_DETECT, false)
+
+    fun setFaceAutoDialogEnabled(enabled: Boolean) {
+        mmkv.encode(KEY_FACE_AUTO_DIALOG, enabled)
+        if (enabled) {
+            mmkv.encode(KEY_FACE_AUTO_GREET, false)
+        }
+    }
+
+    fun isFaceAutoDialogEnabled(): Boolean = mmkv.decodeBool(KEY_FACE_AUTO_DIALOG, false)
+
+    fun setFaceAutoGreetEnabled(enabled: Boolean) {
+        mmkv.encode(KEY_FACE_AUTO_GREET, enabled)
+        if (enabled) {
+            mmkv.encode(KEY_FACE_AUTO_DIALOG, false)
+        }
+    }
+
+    fun isFaceAutoGreetEnabled(): Boolean = mmkv.decodeBool(KEY_FACE_AUTO_GREET, false)
 }

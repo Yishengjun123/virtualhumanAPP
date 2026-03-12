@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
@@ -40,6 +41,60 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             app:layout_constraintGuide_percent="0.65" />
+
+        <LinearLayout
+            android:id="@+id/networkStatusPanel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#55000000"
+            android:orientation="vertical"
+            android:padding="8dp"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent">
+
+            <TextView
+                android:id="@+id/tvNetStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                android:textStyle="bold"
+                tools:text="Status: Connected" />
+
+            <TextView
+                android:id="@+id/tvNetWifi"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="11sp"
+                tools:text="WIFI: MyWifi" />
+
+            <TextView
+                android:id="@+id/tvNetDownload"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp"
+                tools:text="Down: 0.00 KB/s" />
+
+            <TextView
+                android:id="@+id/tvNetUpload"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textColor="#FFFFFF"
+                android:textSize="10sp"
+                tools:text="Up: 0.00 KB/s" />
+        </LinearLayout>
+
+        <androidx.camera.view.PreviewView
+            android:id="@+id/previewFace"
+            android:layout_width="110dp"
+            android:layout_height="150dp"
+            android:layout_marginTop="96dp"
+            android:background="#44000000"
+            android:visibility="gone"
+            app:layout_constraintEnd_toEndOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
 
         <FrameLayout
             android:id="@+id/chatPanel"

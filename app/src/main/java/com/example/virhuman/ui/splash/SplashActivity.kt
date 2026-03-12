@@ -1,4 +1,4 @@
-package com.example.virhuman.ui.splash
+﻿package com.example.virhuman.ui.splash
 
 import android.Manifest
 import android.content.Intent
@@ -15,9 +15,15 @@ import com.example.virhuman.ui.login.LoginActivity
 import kotlin.concurrent.thread
 
 class SplashActivity : AppCompatActivity() {
-    @Volatile private var permissionReady = false
-    @Volatile private var warmupReady = false
-    @Volatile private var routed = false
+    @Volatile
+    private var permissionReady = false
+
+    @Volatile
+    private var warmupReady = false
+
+    @Volatile
+    private var routed = false
+
     private val startedAt = SystemClock.elapsedRealtime()
 
     private val permissionLauncher = registerForActivityResult(
@@ -25,8 +31,12 @@ class SplashActivity : AppCompatActivity() {
     ) { result ->
         permissionReady = true
         val audioGranted = result[Manifest.permission.RECORD_AUDIO] == true
+        val locationGranted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true
         if (!audioGranted) {
             Toast.makeText(this, R.string.permission_audio_tip, Toast.LENGTH_SHORT).show()
+        }
+        if (!locationGranted) {
+            Toast.makeText(this, R.string.permission_location_tip, Toast.LENGTH_SHORT).show()
         }
         tryRouteNext()
     }
@@ -41,7 +51,8 @@ class SplashActivity : AppCompatActivity() {
     private fun requestRuntimePermissions() {
         val required = arrayOf(
             Manifest.permission.RECORD_AUDIO,
-            Manifest.permission.CAMERA
+            Manifest.permission.CAMERA,
+            Manifest.permission.ACCESS_FINE_LOCATION
         )
         val missing = required.filter {
             ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED

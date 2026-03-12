@@ -1,8 +1,9 @@
-<resources>
+﻿<resources>
     <string name="app_name">VirHuman</string>
     <string name="splash_title">VirHuman</string>
     <string name="splash_loading">Initializing voice services...</string>
     <string name="permission_audio_tip">Microphone permission is recommended for voice interaction.</string>
+    <string name="permission_location_tip">Location permission is recommended to display Wi-Fi name.</string>
     <string name="login_title">Login</string>
     <string name="device_code_label">Device Code: %1$s</string>
     <string name="main_title">Digital Human Main</string>
@@ -19,9 +20,9 @@
     <string name="show_device_short">DEV</string>
     <string name="subtitle_hint">Recognition subtitle will show here</string>
     <string name="login_empty_error">Account or password cannot be empty</string>
-    <string name="login_invalid_account">账号密码有误</string>
-    <string name="login_no_device">无该设备信息</string>
-    <string name="login_request_failed">登录请求失败: %1$s</string>
+    <string name="login_invalid_account">璐﹀彿瀵嗙爜鏈夎</string>
+    <string name="login_no_device">鏃犺璁惧淇℃伅</string>
+    <string name="login_request_failed">鐧诲綍璇锋眰澶辫触: %1$s</string>
     <string name="asr_error">Recognition failed: %1$s</string>
     <string name="asr_not_available">Sherpa STT is not ready. Check model files under assets/sherpa/stt.</string>
     <string name="asr_initializing">Initializing Sherpa STT model...</string>
@@ -46,4 +47,8 @@
     <string name="relogin">Re-login</string>
     <string name="exit_app">Exit App</string>
     <string name="already_latest">Already latest version</string>
+    <string name="face_auto_dialog">Auto start dialog on face</string>
+    <string name="face_auto_greet">Auto greet on face</string>
+    <string name="face_greet_text">你好啊！快来和我说话吧！</string>
 </resources>
+

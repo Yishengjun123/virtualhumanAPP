@@ -24,14 +24,18 @@ import com.example.virhuman.ai.asr.AsrEngine
 import com.example.virhuman.ai.asr.GlobalAsrManager
 import com.example.virhuman.ai.tts.SherpaTtsEngine
 import com.example.virhuman.ai.tts.TtsEngine
+import com.example.virhuman.data.MMKVHelper
 import com.example.virhuman.databinding.ActivityMainBinding
 import com.example.virhuman.ui.settings.SettingsActivity
+import com.example.virhuman.util.WifiMonitor
 import com.example.virhuman.video.DigitalHumanState
 import com.example.virhuman.video.DigitalHumanVideoPlayer
+import com.example.virhuman.vision.FaceDetectionController
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private val tag = "MainVoiceChain"
+    private val faceTag = "FaceDetect"
     private val minSpeakChars = 8
     private lateinit var binding: ActivityMainBinding
     private var asrEngine: AsrEngine? = null
@@ -40,14 +44,33 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private val mainHandler = Handler(Looper.getMainLooper())
     private var currentState: DigitalHumanState? = null
     private var isListening = false
-    @Volatile private var asrInitializing = false
-    @Volatile private var ttsInitializing = false
-    @Volatile private var aiRequesting = false
-    @Volatile private var isFinalizingToAi = false
-    @Volatile private var awaitingAsrFinal = false
-    @Volatile private var spokenCursor = 0
+
+    @Volatile
+    private var asrInitializing = false
+
+    @Volatile
+    private var ttsInitializing = false
+
+    @Volatile
+    private var aiRequesting = false
+
+    @Volatile
+    private var isFinalizingToAi = false
+
+    @Volatile
+    private var awaitingAsrFinal = false
+
+    @Volatile
+    private var spokenCursor = 0
+
     private var aiBubbleView: TextView? = null
     private var userBubbleView: TextView? = null
+
+    private var faceController: FaceDetectionController? = null
+    private var hasUserDetected = false
+    private var faceDetectedStartTime = 0L
+    private var lastFaceDetected = false
+    private val faceStableMs = 1000L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,6 +81,19 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         switchState(DigitalHumanState.LEISURE)
         DashScopeManager.updateCredentials(BuildConfig.AI_APP_ID, BuildConfig.AI_API_KEY)
         warmupEngines()
+
+        WifiMonitor.init(this) { status, wifiName, downloadSpeed, uploadSpeed ->
+            runOnUiThread {
+                binding.tvNetStatus.text = status
+                binding.tvNetWifi.text = wifiName
+                binding.tvNetDownload.text = downloadSpeed
+                binding.tvNetUpload.text = uploadSpeed
+            }
+        }
+
+        faceController = FaceDetectionController(this) { detectedNow ->
+            handleFaceDetectionResult(detectedNow)
+        }
 
         binding.btnStartListen.setOnClickListener {
             if (isListening) {
@@ -101,11 +137,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     }
 
     private fun ensureAudioPermission(onGranted: () -> Unit) {
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.RECORD_AUDIO
-            ) == PackageManager.PERMISSION_GRANTED
-        ) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
             onGranted()
             return
         }
@@ -156,8 +188,23 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        WifiMonitor.startMonitoring()
+        syncFaceDetectionState()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        WifiMonitor.stopMonitoring()
+        stopFaceDetection()
+    }
+
     override fun onDestroy() {
         super.onDestroy()
+        WifiMonitor.stopMonitoring()
+        faceController?.release()
+        faceController = null
         awaitingAsrFinal = false
         isFinalizingToAi = false
         DashScopeManager.cancelCurrentStreaming()
@@ -195,18 +242,15 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         var mergedText = ""
         aiBubbleView = null
         spokenCursor = 0
-        ensureTtsReady(showHint = false) { engine ->
-            engine?.stop()
-        }
+        ensureTtsReady(showHint = false) { engine -> engine?.stop() }
+
         DashScopeManager.streamCall(
             prompt = prompt,
             onChunk = { chunk ->
                 Log.d(tag, "AI回复(chunk): $chunk")
                 mergedText = mergeStreamText(mergedText, chunk)
                 Log.d(tag, "AI回复(merged): $mergedText")
-                runOnUiThread {
-                    updateAiBubble(mergedText)
-                }
+                runOnUiThread { updateAiBubble(mergedText) }
                 speakReadySentences(mergedText, flushTail = false)
             },
             onDone = {
@@ -219,14 +263,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                     }
                     return@streamCall
                 }
-                runOnUiThread {
-                    updateAiBubble(finalReply)
-                }
+                runOnUiThread { updateAiBubble(finalReply) }
                 Log.d(tag, "AI回复(final): $finalReply")
                 speakReadySentences(finalReply, flushTail = true)
-                if (finalReply.isBlank()) {
-                    switchState(DigitalHumanState.LEISURE)
-                }
                 isFinalizingToAi = false
             },
             onError = { message ->
@@ -237,14 +276,11 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                     Toast.makeText(this, getString(R.string.ai_error, message), Toast.LENGTH_SHORT).show()
                 }
                 switchState(DigitalHumanState.LEISURE)
-                ensureTtsReady(showHint = false) { engine ->
-                    engine?.stop()
-                }
+                ensureTtsReady(showHint = false) { engine -> engine?.stop() }
             }
         )
     }
 
-    // DashScope stream may return either full text or incremental text; handle both.
     private fun mergeStreamText(previous: String, incoming: String): String {
         val chunk = incoming.trim()
         if (chunk.isEmpty()) return previous
@@ -255,24 +291,18 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private fun speakReadySentences(fullText: String, flushTail: Boolean) {
         val text = fullText.trim()
         if (text.isEmpty()) return
-        if (spokenCursor > text.length) {
-            spokenCursor = 0
-        }
-        val end = if (flushTail) {
-            text.length
-        } else {
-            findSpeakBoundary(text, spokenCursor)
-        }
+        if (spokenCursor > text.length) spokenCursor = 0
+
+        val end = if (flushTail) text.length else findSpeakBoundary(text, spokenCursor)
         if (end <= spokenCursor) return
 
         val segment = text.substring(spokenCursor, end).trim()
         spokenCursor = end
         if (segment.isEmpty()) return
+
         Log.d(tag, "TTS播报(segment): $segment")
         switchState(DigitalHumanState.SPEAKING)
-        ensureTtsReady(showHint = false) { engine ->
-            engine?.speak(segment)
-        }
+        ensureTtsReady(showHint = false) { engine -> engine?.speak(segment) }
     }
 
     private fun findSpeakBoundary(text: String, start: Int): Int {
@@ -280,9 +310,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             when (text[i]) {
                 '\u3002', '\uFF01', '\uFF1F', '!', '?', '\n' -> {
                     val end = i + 1
-                    if (end - start >= minSpeakChars) {
-                        return end
-                    }
+                    if (end - start >= minSpeakChars) return end
                 }
             }
         }
@@ -335,7 +363,6 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     }
 
     private fun warmupEngines() {
-        // Preload in background to reduce first-click latency.
         ensureAsrReady(showHint = false) {}
         ensureTtsReady(showHint = false) {}
     }
@@ -351,7 +378,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     }
 
     private fun ensureChatVisible() {
-        if (binding.chatPanel.visibility != View.VISIBLE) binding.chatPanel.visibility = View.VISIBLE
+        if (binding.chatPanel.visibility != View.VISIBLE) {
+            binding.chatPanel.visibility = View.VISIBLE
+        }
     }
 
     private fun prepareLiveUserBubble() {
@@ -395,20 +424,13 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
 
     private fun buildBubble(text: String, isAi: Boolean): TextView {
         val view = TextView(this)
-        val maxWidth = (resources.displayMetrics.widthPixels * 0.62f).toInt()
-        view.maxWidth = maxWidth
+        view.maxWidth = (resources.displayMetrics.widthPixels * 0.62f).toInt()
         view.text = text
         view.setTextColor(0xFFFFFFFF.toInt())
         view.textSize = 16f
         view.setPadding(18, 12, 18, 12)
-        view.background = ContextCompat.getDrawable(
-            this,
-            if (isAi) R.drawable.bg_bubble_ai else R.drawable.bg_bubble_user
-        )
-        val params = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        )
+        view.background = ContextCompat.getDrawable(this, if (isAi) R.drawable.bg_bubble_ai else R.drawable.bg_bubble_user)
+        val params = LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         params.gravity = if (isAi) Gravity.END else Gravity.START
         params.topMargin = 8
         view.layoutParams = params
@@ -416,9 +438,68 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     }
 
     private fun scrollChatToBottom() {
-        binding.svChat.post {
-            binding.svChat.fullScroll(View.FOCUS_DOWN)
+        binding.svChat.post { binding.svChat.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun syncFaceDetectionState() {
+        if (!MMKVHelper.isFaceDetectEnabled()) {
+            stopFaceDetection()
+            return
         }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            binding.previewFace.visibility = View.GONE
+            Log.w(faceTag, "camera permission missing, face detection disabled")
+            return
+        }
+        binding.previewFace.visibility = View.VISIBLE
+        faceController?.start(this, binding.previewFace)
+    }
+
+    private fun stopFaceDetection() {
+        binding.previewFace.visibility = View.GONE
+        faceController?.stop()
+        hasUserDetected = false
+        faceDetectedStartTime = 0L
+        lastFaceDetected = false
+    }
+
+    private fun handleFaceDetectionResult(faceNow: Boolean) {
+        if (faceNow) {
+            if (!lastFaceDetected) {
+                faceDetectedStartTime = System.currentTimeMillis()
+                Log.d(faceTag, "face first seen")
+            }
+            val duration = System.currentTimeMillis() - faceDetectedStartTime
+            if (duration >= faceStableMs && !hasUserDetected) {
+                hasUserDetected = true
+                Log.d(faceTag, "user detected (stable >=${faceStableMs}ms)")
+                runOnUiThread {
+                    Toast.makeText(this, "检测到人脸", Toast.LENGTH_SHORT).show()
+                    when {
+                        MMKVHelper.isFaceAutoDialogEnabled() -> {
+                            if (!isListening && !aiRequesting) {
+                                binding.btnStartListen.performClick()
+                            }
+                        }
+                        MMKVHelper.isFaceAutoGreetEnabled() -> {
+                            if (!isListening && !aiRequesting) {
+                                switchState(DigitalHumanState.SPEAKING)
+                                ensureTtsReady(showHint = false) { engine ->
+                                    engine?.speak(getString(R.string.face_greet_text))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            faceDetectedStartTime = 0L
+            if (hasUserDetected) {
+                hasUserDetected = false
+                Log.d(faceTag, "user lost")
+            }
+        }
+        lastFaceDetected = faceNow
     }
 }
 
