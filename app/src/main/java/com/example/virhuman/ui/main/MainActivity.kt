@@ -1,4 +1,4 @@
-﻿package com.example.virhuman.ui.main
+package com.example.virhuman.ui.main
 
 import android.Manifest
 import android.content.Intent
@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.View
@@ -62,6 +63,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
 
     @Volatile
     private var spokenCursor = 0
+    @Volatile
+    private var lastTtsRequestAt = 0L
+
 
     private var aiBubbleView: TextView? = null
     private var userBubbleView: TextView? = null
@@ -71,6 +75,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private var faceDetectedStartTime = 0L
     private var lastFaceDetected = false
     private val faceStableMs = 1000L
+    private val asrReadyCallbacks = mutableListOf<(AsrEngine?) -> Unit>()
+    private val ttsReadyCallbacks = mutableListOf<(TtsEngine?) -> Unit>()
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -247,9 +254,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         DashScopeManager.streamCall(
             prompt = prompt,
             onChunk = { chunk ->
-                Log.d(tag, "AI回复(chunk): $chunk")
+                Log.d(tag, "AI鍥炲(chunk): $chunk")
                 mergedText = mergeStreamText(mergedText, chunk)
-                Log.d(tag, "AI回复(merged): $mergedText")
+                Log.d(tag, "AI鍥炲(merged): $mergedText")
                 runOnUiThread { updateAiBubble(mergedText) }
                 speakReadySentences(mergedText, flushTail = false)
             },
@@ -264,14 +271,14 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                     return@streamCall
                 }
                 runOnUiThread { updateAiBubble(finalReply) }
-                Log.d(tag, "AI回复(final): $finalReply")
+                Log.d(tag, "AI鍥炲(final): $finalReply")
                 speakReadySentences(finalReply, flushTail = true)
                 isFinalizingToAi = false
             },
             onError = { message ->
                 aiRequesting = false
                 isFinalizingToAi = false
-                Log.e(tag, "AI请求失败: $message")
+                Log.e(tag, "AI璇锋眰澶辫触: $message")
                 runOnUiThread {
                     Toast.makeText(this, getString(R.string.ai_error, message), Toast.LENGTH_SHORT).show()
                 }
@@ -300,7 +307,8 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         spokenCursor = end
         if (segment.isEmpty()) return
 
-        Log.d(tag, "TTS播报(segment): $segment")
+        Log.d(tag, "TTS鎾姤(segment): $segment")
+        lastTtsRequestAt = SystemClock.elapsedRealtime()
         switchState(DigitalHumanState.SPEAKING)
         ensureTtsReady(showHint = false) { engine -> engine?.speak(segment) }
     }
@@ -323,14 +331,20 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             onReady(existing)
             return
         }
-        if (asrInitializing) return
-        asrInitializing = true
+        synchronized(asrReadyCallbacks) {
+            asrReadyCallbacks.add(onReady)
+            if (asrInitializing) return
+            asrInitializing = true
+        }
         if (showHint) Toast.makeText(this, R.string.asr_initializing, Toast.LENGTH_SHORT).show()
         thread(start = true, name = "asr-init") {
             val engine = GlobalAsrManager.acquire(applicationContext, this)
             asrEngine = engine
             asrInitializing = false
-            runOnUiThread { onReady(engine) }
+            val callbacks = synchronized(asrReadyCallbacks) {
+                asrReadyCallbacks.toList().also { asrReadyCallbacks.clear() }
+            }
+            runOnUiThread { callbacks.forEach { it(engine) } }
         }
     }
 
@@ -340,8 +354,11 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             onReady(existing)
             return
         }
-        if (ttsInitializing) return
-        ttsInitializing = true
+        synchronized(ttsReadyCallbacks) {
+            ttsReadyCallbacks.add(onReady)
+            if (ttsInitializing) return
+            ttsInitializing = true
+        }
         if (showHint) Toast.makeText(this, R.string.tts_initializing, Toast.LENGTH_SHORT).show()
         thread(start = true, name = "tts-init") {
             val engine = try {
@@ -351,14 +368,18 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             }
             engine?.setOnIdleListener {
                 mainHandler.postDelayed({
-                    if (!isListening && !aiRequesting) {
+                    val elapsed = SystemClock.elapsedRealtime() - lastTtsRequestAt
+                    if (!isListening && !aiRequesting && elapsed > 600L) {
                         switchState(DigitalHumanState.LEISURE)
                     }
                 }, 120L)
             }
             ttsEngine = engine
             ttsInitializing = false
-            runOnUiThread { onReady(engine) }
+            val callbacks = synchronized(ttsReadyCallbacks) {
+                ttsReadyCallbacks.toList().also { ttsReadyCallbacks.clear() }
+            }
+            runOnUiThread { callbacks.forEach { it(engine) } }
         }
     }
 
@@ -474,7 +495,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 hasUserDetected = true
                 Log.d(faceTag, "user detected (stable >=${faceStableMs}ms)")
                 runOnUiThread {
-                    Toast.makeText(this, "检测到人脸", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, "妫€娴嬪埌浜鸿劯", Toast.LENGTH_SHORT).show()
                     when {
                         MMKVHelper.isFaceAutoDialogEnabled() -> {
                             if (!isListening && !aiRequesting) {
@@ -483,9 +504,13 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                         }
                         MMKVHelper.isFaceAutoGreetEnabled() -> {
                             if (!isListening && !aiRequesting) {
+                                lastTtsRequestAt = SystemClock.elapsedRealtime()
                                 switchState(DigitalHumanState.SPEAKING)
                                 ensureTtsReady(showHint = false) { engine ->
-                                    engine?.speak(getString(R.string.face_greet_text))
+                                    val ok = engine?.speak(getString(R.string.face_greet_text)) == true
+                                    if (!ok) {
+                                        switchState(DigitalHumanState.LEISURE)
+                                    }
                                 }
                             }
                         }
