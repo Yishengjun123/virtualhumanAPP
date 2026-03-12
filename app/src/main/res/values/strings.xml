@@ -1,54 +1,62 @@
-﻿<resources>
-    <string name="app_name">VirHuman</string>
-    <string name="splash_title">VirHuman</string>
-    <string name="splash_loading">Initializing voice services...</string>
-    <string name="permission_audio_tip">Microphone permission is recommended for voice interaction.</string>
-    <string name="permission_location_tip">Location permission is recommended to display Wi-Fi name.</string>
-    <string name="login_title">Login</string>
-    <string name="device_code_label">Device Code: %1$s</string>
-    <string name="main_title">Digital Human Main</string>
-    <string name="input_account">Enter account</string>
-    <string name="input_password">Enter password</string>
-    <string name="login_now">Login</string>
-    <string name="remember_pwd">Remember password</string>
-    <string name="start_asr">Start Speech Recognition</string>
-    <string name="stop_asr">Stop Speech Recognition</string>
-    <string name="start_asr_short">STT</string>
-    <string name="stop_asr_short">STOP</string>
-    <string name="start_tts_short">TTS</string>
-    <string name="settings_short">SET</string>
-    <string name="show_device_short">DEV</string>
-    <string name="subtitle_hint">Recognition subtitle will show here</string>
-    <string name="login_empty_error">Account or password cannot be empty</string>
-    <string name="login_invalid_account">璐﹀彿瀵嗙爜鏈夎</string>
-    <string name="login_no_device">鏃犺璁惧淇℃伅</string>
-    <string name="login_request_failed">鐧诲綍璇锋眰澶辫触: %1$s</string>
-    <string name="asr_error">Recognition failed: %1$s</string>
-    <string name="asr_not_available">Sherpa STT is not ready. Check model files under assets/sherpa/stt.</string>
-    <string name="asr_initializing">Initializing Sherpa STT model...</string>
-    <string name="asr_stopped_toast">Recognition ended</string>
-    <string name="start_tts_test">Test TTS</string>
-    <string name="show_device_info">Show Device Info</string>
-    <string name="tts_demo_text">Hello, welcome to the TTS feature. The year is 2026. Keep going.</string>
-    <string name="tts_not_ready">Sherpa TTS is not ready. Check model files under assets/sherpa/tts.</string>
-    <string name="tts_speak_failed">TTS speak failed.</string>
-    <string name="tts_initializing">Initializing Sherpa TTS model...</string>
-    <string name="ai_sent_toast">Sent to AI</string>
-    <string name="ai_waiting">AI is thinking...</string>
-    <string name="ai_error">AI request failed: %1$s</string>
-    <string name="ai_empty_reply">AI returned empty text</string>
-    <string name="ai_not_configured">Please configure DashScope AppId and ApiKey first</string>
-    <string name="ai_request_in_progress">AI is still processing the previous request</string>
-    <string name="settings_title">Settings</string>
-    <string name="settings_back">Back</string>
-    <string name="current_version_label">Current Version: %1$s</string>
-    <string name="check_update">Check Update</string>
-    <string name="face_detect_toggle">Face Detection</string>
-    <string name="relogin">Re-login</string>
-    <string name="exit_app">Exit App</string>
-    <string name="already_latest">Already latest version</string>
-    <string name="face_auto_dialog">Auto start dialog on face</string>
-    <string name="face_auto_greet">Auto greet on face</string>
-    <string name="face_greet_text">你好啊！快来和我说话吧！</string>
-</resources>
+<resources>
+    <string name="app_name">智能数字人</string>
+    <string name="splash_title">智能数字人</string>
+    <string name="splash_loading">正在初始化语音服务...</string>
+    <string name="permission_audio_tip">建议授予麦克风权限，以便进行语音交互。</string>
+    <string name="permission_location_tip">建议授予定位权限，以便显示 Wi-Fi 名称。</string>
 
+    <string name="login_title">登录</string>
+    <string name="device_code_label">设备编号：%1$s</string>
+    <string name="main_title">数字人主界面</string>
+    <string name="input_account">请输入账号</string>
+    <string name="input_password">请输入密码</string>
+    <string name="login_now">登录</string>
+    <string name="remember_pwd">记住密码</string>
+
+    <string name="start_asr">开始语音识别</string>
+    <string name="stop_asr">停止语音识别</string>
+    <string name="start_asr_short">开始</string>
+    <string name="stop_asr_short">停止</string>
+    <string name="start_tts_short">设置</string>
+    <string name="settings_short">设置</string>
+    <string name="show_device_short">设备</string>
+    <string name="subtitle_hint">识别字幕将显示在这里</string>
+
+    <string name="login_empty_error">账号或密码不能为空</string>
+    <string name="login_invalid_account">账号或密码有误</string>
+    <string name="login_no_device">无该设备信息</string>
+    <string name="login_request_failed">登录请求失败：%1$s</string>
+
+    <string name="asr_error">语音识别失败：%1$s</string>
+    <string name="asr_not_available">离线语音识别未就绪，请检查 assets/sherpa/stt 下模型文件。</string>
+    <string name="asr_initializing">正在初始化离线语音识别模型...</string>
+    <string name="asr_stopped_toast">识别已结束</string>
+
+    <string name="start_tts_test">测试语音播报</string>
+    <string name="show_device_info">显示设备信息</string>
+    <string name="device_info_toast">设备信息：型号 %1$s，代号 %2$s</string>
+    <string name="tts_demo_text">你好，欢迎使用 TTS 功能，现在是 2026 年！继续加油。</string>
+    <string name="tts_not_ready">离线语音合成未就绪，请检查 assets/sherpa/tts 下模型文件。</string>
+    <string name="tts_speak_failed">语音播报失败。</string>
+    <string name="tts_initializing">正在初始化离线语音合成模型...</string>
+
+    <string name="ai_sent_toast">已发送给智能体</string>
+    <string name="ai_waiting">智能体思考中...</string>
+    <string name="ai_error">智能体请求失败：%1$s</string>
+    <string name="ai_empty_reply">智能体返回内容为空</string>
+    <string name="ai_not_configured">请先配置百炼 AppId 和 ApiKey</string>
+    <string name="ai_request_in_progress">上一条智能体请求仍在处理中</string>
+
+    <string name="settings_title">设置</string>
+    <string name="settings_back">返回</string>
+    <string name="current_version_label">当前版本：%1$s</string>
+    <string name="check_update">检查更新</string>
+    <string name="face_detect_toggle">人脸检测</string>
+    <string name="face_auto_dialog">检测到人脸自动开启对话</string>
+    <string name="face_auto_greet">检测到人脸自动打招呼</string>
+    <string name="face_detected_toast">检测到人脸</string>
+    <string name="face_greet_text">你好啊！快来和我说话吧！</string>
+    <string name="relogin">重新登录</string>
+    <string name="exit_app">退出应用</string>
+    <string name="already_latest">当前已是最新版本</string>
+</resources>

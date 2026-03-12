@@ -62,14 +62,14 @@ object WifiMonitor {
         val network = cm.activeNetwork
         val caps = cm.getNetworkCapabilities(network)
         val connected = caps != null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-        val status = if (connected) "Status: Connected" else "Status: Disconnected"
+        val status = if (connected) "网络状态：已连接" else "网络状态：未连接"
 
         val networkName = when {
-            caps == null -> "Network: --"
+            caps == null -> "网络：--"
             caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> readWifiName(context)
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "Network: Cellular"
-            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "Network: Ethernet"
-            else -> "Network: Connected"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "网络：移动数据"
+            caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "网络：有线网络"
+            else -> "网络：已连接"
         }
 
         val (downloadSpeed, uploadSpeed) = calculateAppNetworkSpeed(connected)
@@ -82,19 +82,19 @@ object WifiMonitor {
             Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
         if (!hasLocationPermission) {
-            return "WIFI: Permission Needed"
+            return "Wi-Fi：缺少定位权限"
         }
 
         if (!isLocationEnabled(context)) {
-            return "WIFI: Location Off"
+            return "Wi-Fi：定位未开启"
         }
 
         val wm = context.applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
         val ssid = wm.connectionInfo?.ssid?.replace("\"", "").orEmpty()
         return if (ssid.isNotBlank() && ssid != "<unknown ssid>") {
-            "WIFI: $ssid"
+            "Wi-Fi：$ssid"
         } else {
-            "WIFI: Connected"
+            "Wi-Fi：已连接"
         }
     }
 
@@ -109,7 +109,7 @@ object WifiMonitor {
             lastTime = System.currentTimeMillis()
             lastRxBytes = getUidRxBytes().coerceAtLeast(0)
             lastTxBytes = getUidTxBytes().coerceAtLeast(0)
-            return Pair("Down: 0.00 KB/s", "Up: 0.00 KB/s")
+            return Pair("下行：0.00 KB/s", "上行：0.00 KB/s")
         }
 
         val currentRxBytes = getUidRxBytes()
@@ -117,18 +117,18 @@ object WifiMonitor {
         val currentTime = System.currentTimeMillis()
 
         if (currentRxBytes < 0 || currentTxBytes < 0) {
-            return Pair("Down: -- KB/s", "Up: -- KB/s")
+            return Pair("下行：-- KB/s", "上行：-- KB/s")
         }
 
         if (lastTime == 0L) {
             lastRxBytes = currentRxBytes
             lastTxBytes = currentTxBytes
             lastTime = currentTime
-            return Pair("Down: -- KB/s", "Up: -- KB/s")
+            return Pair("下行：-- KB/s", "上行：-- KB/s")
         }
 
         val timeDiff = currentTime - lastTime
-        if (timeDiff <= 0) return Pair("Down: -- KB/s", "Up: -- KB/s")
+        if (timeDiff <= 0) return Pair("下行：-- KB/s", "上行：-- KB/s")
 
         val rxSpeed = ((currentRxBytes - lastRxBytes) * 1000.0) / timeDiff
         val txSpeed = ((currentTxBytes - lastTxBytes) * 1000.0) / timeDiff
@@ -136,8 +136,8 @@ object WifiMonitor {
         val rxSpeedKb = (rxSpeed / 1024.0).coerceAtLeast(0.0)
         val txSpeedKb = (txSpeed / 1024.0).coerceAtLeast(0.0)
 
-        val down = String.format(Locale.US, "Down: %.2f KB/s", rxSpeedKb)
-        val up = String.format(Locale.US, "Up: %.2f KB/s", txSpeedKb)
+        val down = String.format(Locale.US, "下行：%.2f KB/s", rxSpeedKb)
+        val up = String.format(Locale.US, "上行：%.2f KB/s", txSpeedKb)
 
         lastRxBytes = currentRxBytes
         lastTxBytes = currentTxBytes

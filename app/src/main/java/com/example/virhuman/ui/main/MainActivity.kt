@@ -139,7 +139,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             val model = Build.MODEL
             val deviceCode = Build.DEVICE
             Log.d(tag, "DeviceInfo model=$model, deviceCode=$deviceCode")
-            Toast.makeText(this, "model=$model, device=$deviceCode", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.device_info_toast, model, deviceCode), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -495,7 +495,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 hasUserDetected = true
                 Log.d(faceTag, "user detected (stable >=${faceStableMs}ms)")
                 runOnUiThread {
-                    Toast.makeText(this, "妫€娴嬪埌浜鸿劯", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(this, R.string.face_detected_toast, Toast.LENGTH_SHORT).show()
                     when {
                         MMKVHelper.isFaceAutoDialogEnabled() -> {
                             if (!isListening && !aiRequesting) {
