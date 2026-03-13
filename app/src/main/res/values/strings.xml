@@ -1,4 +1,4 @@
-<resources>
+﻿<resources>
     <string name="app_name">智能数字人</string>
     <string name="splash_title">智能数字人</string>
     <string name="splash_loading">正在初始化语音服务...</string>
@@ -59,4 +59,13 @@
     <string name="relogin">重新登录</string>
     <string name="exit_app">退出应用</string>
     <string name="already_latest">当前已是最新版本</string>
+
+    <string name="switch_character_short">切换人</string>
+    <string name="switch_character_title">切换人物</string>
+    <string name="switch_character_success">已切换到：%1$s</string>
+    <string name="switch_character_missing_video">人物视频文件不完整，请检查：%1$s</string>
+    <string name="switch_character_busy">当前正在对话，请稍后切换人物</string>
+    <string name="switch_character_tts_fallback">该人物 TTS 未配置，暂用默认女声</string>
+    <string name="character_1_name">人物1</string>
+    <string name="character_2_name">人物2</string>
 </resources>

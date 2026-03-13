@@ -14,6 +14,7 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -78,6 +79,43 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private val asrReadyCallbacks = mutableListOf<(AsrEngine?) -> Unit>()
     private val ttsReadyCallbacks = mutableListOf<(TtsEngine?) -> Unit>()
 
+    private data class CharacterProfile(
+        val id: String,
+        val displayNameRes: Int,
+        val aiAppId: String,
+        val stateVideoMap: Map<DigitalHumanState, String>,
+        val ttsProfileId: String? = null
+    )
+
+    private val characters by lazy {
+        listOf(
+            CharacterProfile(
+                id = "character_1",
+                displayNameRes = R.string.character_1_name,
+                aiAppId = BuildConfig.AI_APP_ID,
+                stateVideoMap = mapOf(
+                    DigitalHumanState.LEISURE to "asset:///videos/leisure.mp4",
+                    DigitalHumanState.LISTENING to "asset:///videos/listening.mp4",
+                    DigitalHumanState.SPEAKING to "asset:///videos/speaking.mp4"
+                ),
+                ttsProfileId = "female_default"
+            ),
+            CharacterProfile(
+                id = "character_2",
+                displayNameRes = R.string.character_2_name,
+                aiAppId = "f3bcd634bc994312bd218e9e5f386aa2",
+                stateVideoMap = mapOf(
+                    DigitalHumanState.LEISURE to "asset:///videos/character2/leisure.mp4",
+                    DigitalHumanState.LISTENING to "asset:///videos/character2/listening.mp4",
+                    DigitalHumanState.SPEAKING to "asset:///videos/character2/speaking.mp4"
+                ),
+                ttsProfileId = null
+            )
+        )
+    }
+
+    private var currentCharacterIndex = 0
+
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,8 +123,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         setContentView(binding.root)
         videoPlayer = DigitalHumanVideoPlayer(this)
         videoPlayer.bind(binding.playerViewFront, binding.playerViewBack)
-        switchState(DigitalHumanState.LEISURE)
-        DashScopeManager.updateCredentials(BuildConfig.AI_APP_ID, BuildConfig.AI_API_KEY)
+        applyCharacter(characters[0], 0, fromStartup = true)
         warmupEngines()
 
         WifiMonitor.init(this) { status, wifiName, downloadSpeed, uploadSpeed ->
@@ -133,6 +170,10 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
 
         binding.btnTtsTest.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
+        }
+
+        binding.btnSwitchCharacter.setOnClickListener {
+            showCharacterDialog()
         }
 
         binding.btnDeviceInfo.setOnClickListener {
@@ -254,9 +295,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         DashScopeManager.streamCall(
             prompt = prompt,
             onChunk = { chunk ->
-                Log.d(tag, "AI鍥炲(chunk): $chunk")
+                Log.d(tag, "AI闂備焦鎮堕崕鎶藉磻濞戔懞?chunk): $chunk")
                 mergedText = mergeStreamText(mergedText, chunk)
-                Log.d(tag, "AI鍥炲(merged): $mergedText")
+                Log.d(tag, "AI闂備焦鎮堕崕鎶藉磻濞戔懞?merged): $mergedText")
                 runOnUiThread { updateAiBubble(mergedText) }
                 speakReadySentences(mergedText, flushTail = false)
             },
@@ -271,14 +312,14 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                     return@streamCall
                 }
                 runOnUiThread { updateAiBubble(finalReply) }
-                Log.d(tag, "AI鍥炲(final): $finalReply")
+                Log.d(tag, "AI闂備焦鎮堕崕鎶藉磻濞戔懞?final): $finalReply")
                 speakReadySentences(finalReply, flushTail = true)
                 isFinalizingToAi = false
             },
             onError = { message ->
                 aiRequesting = false
                 isFinalizingToAi = false
-                Log.e(tag, "AI璇锋眰澶辫触: $message")
+                Log.e(tag, "AI闂佽崵濮村ú顓㈠绩闁秵鍎戦柣妤€鐗嗙欢鐐哄级閸偄浜悮? $message")
                 runOnUiThread {
                     Toast.makeText(this, getString(R.string.ai_error, message), Toast.LENGTH_SHORT).show()
                 }
@@ -307,7 +348,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         spokenCursor = end
         if (segment.isEmpty()) return
 
-        Log.d(tag, "TTS鎾姤(segment): $segment")
+        Log.d(tag, "TTS闂備礁婀遍搹搴ㄥ储閼恒儲鍙?segment): $segment")
         lastTtsRequestAt = SystemClock.elapsedRealtime()
         switchState(DigitalHumanState.SPEAKING)
         ensureTtsReady(showHint = false) { engine -> engine?.speak(segment) }
@@ -484,6 +525,86 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         lastFaceDetected = false
     }
 
+    private fun showCharacterDialog() {
+        if (isListening || aiRequesting || isFinalizingToAi) {
+            Toast.makeText(this, R.string.switch_character_busy, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val names = characters.map { getString(it.displayNameRes) }.toTypedArray()
+        AlertDialog.Builder(this)
+            .setTitle(R.string.switch_character_title)
+            .setItems(names) { _, which ->
+                if (which == currentCharacterIndex) return@setItems
+                applyCharacter(characters[which], which, fromStartup = false)
+            }
+            .show()
+    }
+
+    private fun applyCharacter(profile: CharacterProfile, index: Int, fromStartup: Boolean) {
+        val missing = findMissingVideo(profile)
+        if (missing != null) {
+            Toast.makeText(
+                this,
+                getString(R.string.switch_character_missing_video, missing),
+                Toast.LENGTH_LONG
+            ).show()
+            return
+        }
+
+        val appId = profile.aiAppId.trim().ifBlank { BuildConfig.AI_APP_ID }
+        DashScopeManager.updateCredentials(appId, BuildConfig.AI_API_KEY)
+
+        currentCharacterIndex = index
+        currentState = null
+        videoPlayer.updateAssetMap(profile.stateVideoMap, DigitalHumanState.LEISURE)
+        switchState(DigitalHumanState.LEISURE)
+
+        // Placeholder: persona-specific TTS will be plugged in after model preparation.
+        if (profile.ttsProfileId == null) {
+            Toast.makeText(this, R.string.switch_character_tts_fallback, Toast.LENGTH_SHORT).show()
+        }
+
+        if (!fromStartup) {
+            Toast.makeText(
+                this,
+                getString(R.string.switch_character_success, getString(profile.displayNameRes)),
+                Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    private fun clearChatForCharacterSwitch() {
+        aiBubbleView = null
+        userBubbleView = null
+        spokenCursor = 0
+        awaitingAsrFinal = false
+        isFinalizingToAi = false
+        aiRequesting = false
+        binding.chatContainer.removeAllViews()
+        binding.chatPanel.visibility = View.GONE
+        ttsEngine?.stop()
+        DashScopeManager.cancelCurrentStreaming()
+    }
+
+    private fun findMissingVideo(profile: CharacterProfile): String? {
+        for ((_, uri) in profile.stateVideoMap) {
+            if (!assetExists(uri)) {
+                return uri.removePrefix("asset:///")
+            }
+        }
+        return null
+    }
+
+    private fun assetExists(assetUri: String): Boolean {
+        val relPath = assetUri.removePrefix("asset:///")
+        if (relPath.equals(assetUri, ignoreCase = true)) return false
+        return try {
+            assets.open(relPath).use { }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
     private fun handleFaceDetectionResult(faceNow: Boolean) {
         if (faceNow) {
             if (!lastFaceDetected) {

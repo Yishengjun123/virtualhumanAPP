@@ -44,7 +44,7 @@ class DigitalHumanVideoPlayer(context: Context) {
     private var pendingListener: Player.Listener? = null
     private val mainHandler = Handler(Looper.getMainLooper())
 
-    private val stateToAssetPath = mapOf(
+    private var stateToAssetPath = mapOf(
         DigitalHumanState.LEISURE to "asset:///videos/leisure.mp4",
         DigitalHumanState.LISTENING to "asset:///videos/listening.mp4",
         DigitalHumanState.SPEAKING to "asset:///videos/speaking.mp4"
@@ -66,6 +66,16 @@ class DigitalHumanVideoPlayer(context: Context) {
         backView.alpha = 0f
         frontView.visibility = View.INVISIBLE
         backView.visibility = View.INVISIBLE
+    }
+
+    fun updateAssetMap(
+        newMap: Map<DigitalHumanState, String>,
+        showState: DigitalHumanState = DigitalHumanState.LEISURE
+    ) {
+        stateToAssetPath = newMap
+        currentState = null
+        targetState = null
+        setState(showState)
     }
 
     fun setState(state: DigitalHumanState) {
