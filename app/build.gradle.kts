@@ -1,4 +1,4 @@
-plugins {
+﻿plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
 }
@@ -19,6 +19,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "AI_APP_ID", "\"c5c16ddfba234c57b850accc878eaeb1\"")
         buildConfigField("String", "AI_API_KEY", "\"sk-7626139b5ed14779a4329b6f73da5255\"")
+        buildConfigField("String", "XFYUN_APP_ID", "\"f65eda8f\"")
+        buildConfigField("String", "XFYUN_API_KEY", "\"52ce880e5b2a6a23402e99c735757ecc\"")
+        buildConfigField("String", "XFYUN_API_SECRET", "\"OWUxYTRjYWRkNDkxNWFlYjRlM2RkYzgx\"")
+        buildConfigField("String", "XFYUN_ABILITY", "\"e867a88f2\"")
     }
 
     buildTypes {
@@ -67,6 +71,7 @@ android {
 
 dependencies {
     implementation(files("libs/sherpa-onnx-1.12.27.aar"))
+    implementation(files("libs/AIKit.aar"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
@@ -91,3 +96,4 @@ dependencies {
         version = "2.22.9"
     )
 }
+

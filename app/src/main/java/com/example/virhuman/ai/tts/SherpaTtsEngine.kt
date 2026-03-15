@@ -39,6 +39,9 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
     private var speechRate = 1.0f
 
     @Volatile
+    private var speakerId = 0
+
+    @Volatile
     private var generation = 0
 
     @Volatile
@@ -61,7 +64,7 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
     init {
         try {
             val vitsConfig = OfflineTtsVitsModelConfig().apply {
-                model = "sherpa/tts/model.onnx"
+                model = "sherpa/tts/vits-zh-hf-fanchen-C.onnx"
                 lexicon = "sherpa/tts/lexicon.txt"
                 tokens = "sherpa/tts/tokens.txt"
                 dataDir = ""
@@ -105,13 +108,13 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
                 return@execute
             }
             try {
-                val generated = localTts.generate(text, 0, 1.0f)
+                val generated = localTts.generate(text, speakerId, speechRate)
                 val samples = generated.samples
                 if (samples.isEmpty()) return@execute
-                Log.d(tag, "TTS播报(text): $text")
+                Log.d(tag, "TTS閹绢厽濮?text): $text")
                 Log.d(
                     tag,
-                    "TTS播报(samples=${samples.size}, rate=${generated.sampleRate}, speechRate=$speechRate)"
+                    "TTS閹绢厽濮?samples=${samples.size}, rate=${generated.sampleRate}, speechRate=$speechRate)"
                 )
 
                 val rawPcm = ShortArray(samples.size)
@@ -131,7 +134,7 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
                     }
                 }
             } catch (e: Exception) {
-                Log.e(tag, "TTS播放失败: ${e.message}", e)
+                Log.e(tag, "TTS閹绢厽鏂佹径杈Е: ${e.message}", e)
             } finally {
                 pendingSynthCount.decrementAndGet()
                 synchronized(pendingLock) {
@@ -146,11 +149,16 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
     override fun isReady(): Boolean = ready
 
     override fun setSpeechRate(rate: Float) {
-        speechRate = rate.coerceIn(0.6f, 1.3f)
+        speechRate = rate.coerceIn(0.7f, 1.6f)
     }
 
     override fun setOnIdleListener(listener: (() -> Unit)?) {
         onIdleListener = listener
+    }
+
+
+    override fun setSpeakerId(speakerId: Int) {
+        this.speakerId = speakerId.coerceAtLeast(0)
     }
 
     override fun stop() {
@@ -320,7 +328,6 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
             SystemClock.sleep(20)
         }
     }
-
 
     private fun postProcessPcm(input: ShortArray): ShortArray {
         if (input.isEmpty()) return input

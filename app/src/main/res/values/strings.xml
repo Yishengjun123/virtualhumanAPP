@@ -68,4 +68,13 @@
     <string name="switch_character_tts_fallback">该人物 TTS 未配置，暂用默认女声</string>
     <string name="character_1_name">人物1</string>
     <string name="character_2_name">人物2</string>
+
+    <string name="wakeup_start_failed">语音唤醒未启动，请检查讯飞参数与 ivw 资源。</string>`r`n    <string name="resource_prepare_title">资源准备中</string>
+    <string name="resource_prepare_wait">正在准备资源...</string>
+    <string name="resource_downloading_item">下载中：人物 %1$s / %2$s</string>
+    <string name="resource_progress_percent">%1$d%%</string>
+    <string name="resource_download_done">资源下载完成，正在进入主界面...</string>
+    <string name="resource_download_failed">资源下载失败：%1$s</string>
+    <string name="resource_empty">未获取到可用人物资源</string>
 </resources>
+

@@ -1,7 +1,8 @@
-package com.example.virhuman.ui.main
+﻿package com.example.virhuman.ui.main
 
 import android.Manifest
 import android.content.Intent
+import android.graphics.BitmapFactory
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -11,6 +12,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -27,18 +29,22 @@ import com.example.virhuman.ai.asr.GlobalAsrManager
 import com.example.virhuman.ai.tts.SherpaTtsEngine
 import com.example.virhuman.ai.tts.TtsEngine
 import com.example.virhuman.data.MMKVHelper
+import com.example.virhuman.data.ResourceParser
 import com.example.virhuman.databinding.ActivityMainBinding
 import com.example.virhuman.ui.settings.SettingsActivity
+import com.example.virhuman.util.IflyWakeupManager
 import com.example.virhuman.util.WifiMonitor
 import com.example.virhuman.video.DigitalHumanState
 import com.example.virhuman.video.DigitalHumanVideoPlayer
 import com.example.virhuman.vision.FaceDetectionController
+import java.io.File
+import java.net.URL
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private val tag = "MainVoiceChain"
     private val faceTag = "FaceDetect"
-    private val minSpeakChars = 8
+    private val minSpeakChars = 5
     private lateinit var binding: ActivityMainBinding
     private var asrEngine: AsrEngine? = null
     private var ttsEngine: TtsEngine? = null
@@ -81,40 +87,47 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
 
     private data class CharacterProfile(
         val id: String,
-        val displayNameRes: Int,
+        val displayNameRes: Int = 0,
+        val name: String = "",
+        val introduce: String = "",
+        val picturePathOrUrl: String = "",
         val aiAppId: String,
         val stateVideoMap: Map<DigitalHumanState, String>,
-        val ttsProfileId: String? = null
+        val speakerId: Int,
+        val speechRate: Float
     )
 
-    private val characters by lazy {
-        listOf(
-            CharacterProfile(
-                id = "character_1",
-                displayNameRes = R.string.character_1_name,
-                aiAppId = BuildConfig.AI_APP_ID,
-                stateVideoMap = mapOf(
-                    DigitalHumanState.LEISURE to "asset:///videos/leisure.mp4",
-                    DigitalHumanState.LISTENING to "asset:///videos/listening.mp4",
-                    DigitalHumanState.SPEAKING to "asset:///videos/speaking.mp4"
-                ),
-                ttsProfileId = "female_default"
+    private var characters: List<CharacterProfile> = listOf(
+        CharacterProfile(
+            id = "character_1",
+            displayNameRes = R.string.character_1_name,
+            aiAppId = BuildConfig.AI_APP_ID,
+            stateVideoMap = mapOf(
+                DigitalHumanState.LEISURE to "asset:///videos/leisure.mp4",
+                DigitalHumanState.LISTENING to "asset:///videos/listening.mp4",
+                DigitalHumanState.SPEAKING to "asset:///videos/speaking.mp4"
             ),
-            CharacterProfile(
-                id = "character_2",
-                displayNameRes = R.string.character_2_name,
-                aiAppId = "f3bcd634bc994312bd218e9e5f386aa2",
-                stateVideoMap = mapOf(
-                    DigitalHumanState.LEISURE to "asset:///videos/character2/leisure.mp4",
-                    DigitalHumanState.LISTENING to "asset:///videos/character2/listening.mp4",
-                    DigitalHumanState.SPEAKING to "asset:///videos/character2/speaking.mp4"
-                ),
-                ttsProfileId = null
-            )
+            speakerId = 0,
+            speechRate = 1.3f
+        ),
+        CharacterProfile(
+            id = "character_2",
+            displayNameRes = R.string.character_2_name,
+            aiAppId = "f3bcd634bc994312bd218e9e5f386aa2",
+            stateVideoMap = mapOf(
+                DigitalHumanState.LEISURE to "asset:///videos/character2/leisure.mp4",
+                DigitalHumanState.LISTENING to "asset:///videos/character2/listening.mp4",
+                DigitalHumanState.SPEAKING to "asset:///videos/character2/speaking.mp4"
+            ),
+            speakerId = 88,
+            speechRate = 1.4f
         )
-    }
+    )
 
     private var currentCharacterIndex = 0
+    private var currentSpeakerId = 0
+    private var currentSpeechRate = 1.3f
+    private var wakeupStarted = false
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -123,7 +136,15 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         setContentView(binding.root)
         videoPlayer = DigitalHumanVideoPlayer(this)
         videoPlayer.bind(binding.playerViewFront, binding.playerViewBack)
-        applyCharacter(characters[0], 0, fromStartup = true)
+        characters = loadCharactersFromStorage()
+        if (characters.isEmpty()) {
+            Toast.makeText(this, R.string.resource_empty, Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+        val savedId = MMKVHelper.getCurrentCharacterId()
+        val idx = characters.indexOfFirst { it.id == savedId }.let { if (it >= 0) it else 0 }
+        applyCharacter(characters[idx], idx, fromStartup = true)
         warmupEngines()
 
         WifiMonitor.init(this) { status, wifiName, downloadSpeed, uploadSpeed ->
@@ -137,6 +158,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
 
         faceController = FaceDetectionController(this) { detectedNow ->
             handleFaceDetectionResult(detectedNow)
+        }
+        IflyWakeupManager.setWakeupCallback { keyword ->
+            runOnUiThread { handleWakeupKeyword(keyword) }
         }
 
         binding.btnStartListen.setOnClickListener {
@@ -152,9 +176,11 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 return@setOnClickListener
             }
             ensureAudioPermission {
+                stopWakeupIfRunning()
                 ensureAsrReady { engine ->
                     if (engine == null || !engine.isAvailable()) {
                         Toast.makeText(this, R.string.asr_not_available, Toast.LENGTH_SHORT).show()
+                        startWakeupIfNeeded()
                         return@ensureAsrReady
                     }
                     prepareLiveUserBubble()
@@ -173,7 +199,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         }
 
         binding.btnSwitchCharacter.setOnClickListener {
-            showCharacterDialog()
+            showCharacterDialogWithInfo()
         }
 
         binding.btnDeviceInfo.setOnClickListener {
@@ -206,6 +232,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             userBubbleView = null
             isListening = false
             binding.btnStartListen.setText(R.string.start_asr_short)
+            startWakeupIfNeeded()
         }
         switchState(DigitalHumanState.LISTENING)
         sendToAi(text)
@@ -219,6 +246,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             Toast.makeText(this, getString(R.string.asr_error, message), Toast.LENGTH_SHORT).show()
             isListening = false
             binding.btnStartListen.setText(R.string.start_asr_short)
+            startWakeupIfNeeded()
             if (!aiRequesting && !isFinalizingToAi) {
                 switchState(DigitalHumanState.LEISURE)
             }
@@ -230,6 +258,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             isListening = false
             binding.btnStartListen.setText(R.string.start_asr_short)
             Toast.makeText(this, R.string.asr_stopped_toast, Toast.LENGTH_SHORT).show()
+            startWakeupIfNeeded()
             if (!aiRequesting && !isFinalizingToAi && !awaitingAsrFinal) {
                 switchState(DigitalHumanState.LEISURE)
             }
@@ -240,12 +269,14 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         super.onResume()
         WifiMonitor.startMonitoring()
         syncFaceDetectionState()
+        startWakeupIfNeeded()
     }
 
     override fun onPause() {
         super.onPause()
         WifiMonitor.stopMonitoring()
         stopFaceDetection()
+        stopWakeupIfRunning()
     }
 
     override fun onDestroy() {
@@ -262,6 +293,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         videoPlayer.release()
         ttsEngine?.release()
         ttsEngine = null
+        IflyWakeupManager.release()
     }
 
     private fun sendToAi(userText: String) {
@@ -295,9 +327,9 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         DashScopeManager.streamCall(
             prompt = prompt,
             onChunk = { chunk ->
-                Log.d(tag, "AI闂備焦鎮堕崕鎶藉磻濞戔懞?chunk): $chunk")
+                Log.d(tag, "AI闂傚倸鍊搁崐鐑芥倿閿曞倸绠栭柛顐ｆ礀绾惧潡鏌熼幆鐗堫棄缁惧墽绮换娑㈠箣閺冣偓閸?chunk): $chunk")
                 mergedText = mergeStreamText(mergedText, chunk)
-                Log.d(tag, "AI闂備焦鎮堕崕鎶藉磻濞戔懞?merged): $mergedText")
+                Log.d(tag, "AI闂傚倸鍊搁崐鐑芥倿閿曞倸绠栭柛顐ｆ礀绾惧潡鏌熼幆鐗堫棄缁惧墽绮换娑㈠箣閺冣偓閸?merged): $mergedText")
                 runOnUiThread { updateAiBubble(mergedText) }
                 speakReadySentences(mergedText, flushTail = false)
             },
@@ -312,14 +344,14 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                     return@streamCall
                 }
                 runOnUiThread { updateAiBubble(finalReply) }
-                Log.d(tag, "AI闂備焦鎮堕崕鎶藉磻濞戔懞?final): $finalReply")
+                Log.d(tag, "AI闂傚倸鍊搁崐鐑芥倿閿曞倸绠栭柛顐ｆ礀绾惧潡鏌熼幆鐗堫棄缁惧墽绮换娑㈠箣閺冣偓閸?final): $finalReply")
                 speakReadySentences(finalReply, flushTail = true)
                 isFinalizingToAi = false
             },
             onError = { message ->
                 aiRequesting = false
                 isFinalizingToAi = false
-                Log.e(tag, "AI闂佽崵濮村ú顓㈠绩闁秵鍎戦柣妤€鐗嗙欢鐐哄级閸偄浜悮? $message")
+                Log.e(tag, "AI闂傚倸鍊峰ù鍥х暦閸偅鍙忛柡澶嬪殮濞差亶鏁囬柕蹇曞Х閸濇姊绘笟鍥у缂佸鏁诲畷鏇㈠箣閿旂晫鍘藉┑掳鍊愰崑鎾绘煟濡も偓濡稑鈻庨姀銈嗗€烽柛婵嗗妤犲洭姊洪崜鎻掍航闁稿瀚粋宥夘敍濠婂嫬浠? $message")
                 runOnUiThread {
                     Toast.makeText(this, getString(R.string.ai_error, message), Toast.LENGTH_SHORT).show()
                 }
@@ -348,7 +380,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         spokenCursor = end
         if (segment.isEmpty()) return
 
-        Log.d(tag, "TTS闂備礁婀遍搹搴ㄥ储閼恒儲鍙?segment): $segment")
+        Log.d(tag, "TTS闂傚倸鍊搁崐椋庣矆娴ｉ潻鑰块梺顒€绉甸幆鐐哄箹濞ｎ剙濡奸柛灞诲姂閺屻倝骞侀幒鎴濆闂?segment): $segment")
         lastTtsRequestAt = SystemClock.elapsedRealtime()
         switchState(DigitalHumanState.SPEAKING)
         ensureTtsReady(showHint = false) { engine -> engine?.speak(segment) }
@@ -357,7 +389,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private fun findSpeakBoundary(text: String, start: Int): Int {
         for (i in start until text.length) {
             when (text[i]) {
-                '\u3002', '\uFF01', '\uFF1F', '!', '?', '\n' -> {
+                '\u3002', '\uFF01', '\uFF1F', '!', '?', '\uFF0C', ',', '\uFF1B', ';', '\n' -> {
                     val end = i + 1
                     if (end - start >= minSpeakChars) return end
                 }
@@ -392,6 +424,8 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private fun ensureTtsReady(showHint: Boolean = true, onReady: (TtsEngine?) -> Unit) {
         val existing = ttsEngine
         if (existing != null) {
+            existing.setSpeakerId(currentSpeakerId)
+            existing.setSpeechRate(currentSpeechRate)
             onReady(existing)
             return
         }
@@ -407,6 +441,8 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             } catch (_: Throwable) {
                 null
             }
+            engine?.setSpeakerId(currentSpeakerId)
+            engine?.setSpeechRate(currentSpeechRate)
             engine?.setOnIdleListener {
                 mainHandler.postDelayed({
                     val elapsed = SystemClock.elapsedRealtime() - lastTtsRequestAt
@@ -525,6 +561,69 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         lastFaceDetected = false
     }
 
+
+    private fun startWakeupIfNeeded() {
+        if (wakeupStarted) return
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+        val ok = IflyWakeupManager.startWakeup(this)
+        wakeupStarted = ok
+        if (!ok) {
+            Toast.makeText(this, R.string.wakeup_start_failed, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun stopWakeupIfRunning() {
+        if (!wakeupStarted) return
+        IflyWakeupManager.stopWakeup()
+        wakeupStarted = false
+    }
+
+    private fun handleWakeupKeyword(raw: String) {
+        val keyword = raw.trim()
+        if (keyword.isEmpty()) return
+        val normalized = keyword
+            .replace(" ", "")
+            .replace(";", "")
+            .replace("；", "")
+            .replace("。", "")
+            .replace("，", "")
+        Log.d(tag, "Wakeup raw=$keyword normalized=$normalized")
+        when {
+            normalized.contains("\u4f60\u597d\u901a\u901a") || normalized.contains("\u4f60\u597d\u8c5a\u5b9d") || normalized == "\u4f60\u597d" -> {
+                if (!isListening && !aiRequesting) {
+                    binding.btnStartListen.performClick()
+                }
+            }
+            normalized.contains("\u6682\u505c\u4e00\u4e0b") -> {
+                ttsEngine?.stop()
+                DashScopeManager.cancelCurrentStreaming()
+                aiRequesting = false
+                isFinalizingToAi = false
+                switchState(DigitalHumanState.LEISURE)
+            }
+            normalized.contains("\u518d\u89c1") -> {
+                ttsEngine?.stop()
+                DashScopeManager.cancelCurrentStreaming()
+                aiRequesting = false
+                isFinalizingToAi = false
+                switchState(DigitalHumanState.LEISURE)
+                clearChatForGoodbye()
+            }
+        }
+    }
+
+    private fun clearChatForGoodbye() {
+        aiBubbleView = null
+        userBubbleView = null
+        spokenCursor = 0
+        awaitingAsrFinal = false
+        isFinalizingToAi = false
+        aiRequesting = false
+        binding.chatContainer.removeAllViews()
+        binding.chatPanel.visibility = View.GONE
+    }
     private fun showCharacterDialog() {
         if (isListening || aiRequesting || isFinalizingToAi) {
             Toast.makeText(this, R.string.switch_character_busy, Toast.LENGTH_SHORT).show()
@@ -540,6 +639,71 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             .show()
     }
 
+
+    private fun showCharacterDialogWithInfo() {
+        if (isListening || aiRequesting || isFinalizingToAi) {
+            Toast.makeText(this, R.string.switch_character_busy, Toast.LENGTH_SHORT).show()
+            return
+        }
+        if (characters.isEmpty()) {
+            Toast.makeText(this, R.string.resource_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(28, 18, 28, 8)
+        }
+        var dialogRef: AlertDialog? = null
+
+        characters.forEachIndexed { index, profile ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                setPadding(0, 12, 0, 12)
+            }
+            val image = ImageView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(140, 140)
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageResource(android.R.drawable.ic_menu_gallery)
+            }
+            val textBox = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                    marginStart = 18
+                }
+            }
+            val title = TextView(this).apply {
+                text = if (profile.name.isNotBlank()) profile.name else getString(profile.displayNameRes)
+                textSize = 17f
+                setTextColor(0xFF111111.toInt())
+            }
+            val intro = TextView(this).apply {
+                text = profile.introduce
+                textSize = 13f
+                setTextColor(0xFF666666.toInt())
+            }
+            textBox.addView(title)
+            textBox.addView(intro)
+            row.addView(image)
+            row.addView(textBox)
+            container.addView(row)
+
+            bindCharacterImage(image, profile.picturePathOrUrl)
+            image.setOnClickListener {
+                if (index != currentCharacterIndex) {
+                    applyCharacter(profile, index, fromStartup = false)
+                }
+                dialogRef?.dismiss()
+            }
+        }
+
+        dialogRef = AlertDialog.Builder(this)
+            .setTitle(R.string.switch_character_title)
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialogRef?.show()
+    }
     private fun applyCharacter(profile: CharacterProfile, index: Int, fromStartup: Boolean) {
         val missing = findMissingVideo(profile)
         if (missing != null) {
@@ -555,19 +719,20 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         DashScopeManager.updateCredentials(appId, BuildConfig.AI_API_KEY)
 
         currentCharacterIndex = index
+        MMKVHelper.saveCurrentCharacterId(profile.id)
+        currentSpeakerId = profile.speakerId
+        currentSpeechRate = profile.speechRate
         currentState = null
+        clearChatForCharacterSwitch()
+        ttsEngine?.setSpeakerId(currentSpeakerId)
+        ttsEngine?.setSpeechRate(currentSpeechRate)
         videoPlayer.updateAssetMap(profile.stateVideoMap, DigitalHumanState.LEISURE)
         switchState(DigitalHumanState.LEISURE)
-
-        // Placeholder: persona-specific TTS will be plugged in after model preparation.
-        if (profile.ttsProfileId == null) {
-            Toast.makeText(this, R.string.switch_character_tts_fallback, Toast.LENGTH_SHORT).show()
-        }
 
         if (!fromStartup) {
             Toast.makeText(
                 this,
-                getString(R.string.switch_character_success, getString(profile.displayNameRes)),
+                getString(R.string.switch_character_success, profile.name),
                 Toast.LENGTH_SHORT
             ).show()
         }
@@ -587,22 +752,87 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     }
 
     private fun findMissingVideo(profile: CharacterProfile): String? {
-        for ((_, uri) in profile.stateVideoMap) {
-            if (!assetExists(uri)) {
-                return uri.removePrefix("asset:///")
+        for ((state, uri) in profile.stateVideoMap) {
+            val exists = uriPathExists(uri)
+            Log.d(tag, "VideoCheck character=${profile.id} state=$state uri=$uri exists=$exists")
+            if (!exists) {
+                return "$state -> $uri"
             }
         }
         return null
     }
 
-    private fun assetExists(assetUri: String): Boolean {
-        val relPath = assetUri.removePrefix("asset:///")
-        if (relPath.equals(assetUri, ignoreCase = true)) return false
-        return try {
-            assets.open(relPath).use { }
-            true
-        } catch (_: Exception) {
-            false
+    private fun uriPathExists(uri: String): Boolean {
+        return when {
+            uri.startsWith("asset:///") -> {
+                val relPath = uri.removePrefix("asset:///")
+                try {
+                    assets.open(relPath).use { }
+                    true
+                } catch (_: Exception) {
+                    false
+                }
+            }
+            uri.startsWith("file://") -> File(uri.removePrefix("file://")).exists()
+            uri.startsWith("http://") || uri.startsWith("https://") -> true
+            else -> File(uri).exists()
+        }
+    }
+
+    private fun loadCharactersFromStorage(): List<CharacterProfile> {
+        val jsonText = MMKVHelper.getResourceJson()
+        if (jsonText.isBlank()) return emptyList()
+        val parsed = try {
+            ResourceParser.parseResponse(jsonText)
+        } catch (e: Exception) {
+            Log.e(tag, "parse resource failed: ${e.message}", e)
+            return emptyList()
+        }
+        if (parsed.code != 0 || parsed.characters.isEmpty()) return emptyList()
+
+        return parsed.characters.map { character ->
+            val leisureLocal = MMKVHelper.getVideoLocalPath(character.id, "leisure")
+            val listeningLocal = MMKVHelper.getVideoLocalPath(character.id, "listening")
+            val speakingLocal = MMKVHelper.getVideoLocalPath(character.id, "speaking")
+            val pictureLocal = MMKVHelper.getPictureLocalPath(character.id)
+
+            val leisureUri = if (leisureLocal.isNotBlank() && File(leisureLocal).exists()) "file://${leisureLocal}" else character.leisureUrl
+            val listeningUri = if (listeningLocal.isNotBlank() && File(listeningLocal).exists()) "file://${listeningLocal}" else character.listeningUrl
+            val speakingUri = if (speakingLocal.isNotBlank() && File(speakingLocal).exists()) "file://${speakingLocal}" else character.speakingUrl
+            val pictureUri = if (pictureLocal.isNotBlank() && File(pictureLocal).exists()) "file://${pictureLocal}" else character.picture
+
+            Log.d(tag, "ResourceMap id=${character.id}, leisure=$leisureUri, listening=$listeningUri, speaking=$speakingUri")
+            CharacterProfile(
+                id = character.id,
+                name = character.name,
+                introduce = character.introduce,
+                picturePathOrUrl = pictureUri,
+                aiAppId = character.aiAppId,
+                stateVideoMap = mapOf(
+                    DigitalHumanState.LEISURE to leisureUri,
+                    DigitalHumanState.LISTENING to listeningUri,
+                    DigitalHumanState.SPEAKING to speakingUri
+                ),
+                speakerId = character.speakerId,
+                speechRate = if (character.id == "2") 1.4f else 1.3f
+            )
+        }
+    }
+
+    private fun bindCharacterImage(imageView: ImageView, pathOrUrl: String) {
+        if (pathOrUrl.isBlank()) return
+        thread(start = true, name = "character-image") {
+            try {
+                val bitmap = when {
+                    pathOrUrl.startsWith("file://") -> BitmapFactory.decodeFile(pathOrUrl.removePrefix("file://"))
+                    pathOrUrl.startsWith("http://") || pathOrUrl.startsWith("https://") -> URL(pathOrUrl).openStream().use { BitmapFactory.decodeStream(it) }
+                    else -> null
+                }
+                if (bitmap != null) {
+                    runOnUiThread { imageView.setImageBitmap(bitmap) }
+                }
+            } catch (_: Exception) {
+            }
         }
     }
     private fun handleFaceDetectionResult(faceNow: Boolean) {
@@ -648,4 +878,32 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         lastFaceDetected = faceNow
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
