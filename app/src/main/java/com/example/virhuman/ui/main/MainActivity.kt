@@ -39,6 +39,7 @@ import com.example.virhuman.video.DigitalHumanVideoPlayer
 import com.example.virhuman.vision.FaceDetectionController
 import java.io.File
 import java.net.URL
+import java.util.concurrent.atomic.AtomicInteger
 import kotlin.concurrent.thread
 
 class MainActivity : AppCompatActivity(), AsrEngine.Callback {
@@ -72,6 +73,14 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private var spokenCursor = 0
     @Volatile
     private var lastTtsRequestAt = 0L
+    @Volatile
+    private var continuousAutoListenPending = false
+
+    @Volatile
+    private var aiStreamDoneForCurrentTurn = false
+
+    private val ttsEnqueuedCount = AtomicInteger(0)
+    private val ttsPlayedCount = AtomicInteger(0)
 
 
     private var aiBubbleView: TextView? = null
@@ -169,6 +178,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 asrEngine?.stopListening()
                 isListening = false
                 isFinalizingToAi = false
+                resetContinuousRoundState()
                 binding.btnStartListen.setText(R.string.start_asr_short)
                 if (!aiRequesting) {
                     switchState(DigitalHumanState.LEISURE)
@@ -187,6 +197,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                     switchState(DigitalHumanState.LISTENING)
                     isFinalizingToAi = false
                     awaitingAsrFinal = true
+                    resetContinuousRoundState()
                     engine.startListening()
                     isListening = true
                     binding.btnStartListen.setText(R.string.stop_asr_short)
@@ -267,6 +278,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
 
     override fun onResume() {
         super.onResume()
+        resetContinuousRoundState()
         WifiMonitor.startMonitoring()
         syncFaceDetectionState()
         startWakeupIfNeeded()
@@ -274,6 +286,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
 
     override fun onPause() {
         super.onPause()
+        resetContinuousRoundState()
         WifiMonitor.stopMonitoring()
         stopFaceDetection()
         stopWakeupIfRunning()
@@ -313,7 +326,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         }
 
         aiRequesting = true
-        AiSession.updateSessionId()
+        resetContinuousRoundState()
         runOnUiThread {
             Toast.makeText(this, R.string.ai_sent_toast, Toast.LENGTH_SHORT).show()
         }
@@ -337,6 +350,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 aiRequesting = false
                 val finalReply = mergedText.trim()
                 if (finalReply.isBlank()) {
+                    resetContinuousRoundState()
                     isFinalizingToAi = false
                     runOnUiThread {
                         Toast.makeText(this, R.string.ai_empty_reply, Toast.LENGTH_SHORT).show()
@@ -346,11 +360,14 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 runOnUiThread { updateAiBubble(finalReply) }
                 Log.d(tag, "AI闂傚倸鍊搁崐鐑芥倿閿曞倸绠栭柛顐ｆ礀绾惧潡鏌熼幆鐗堫棄缁惧墽绮换娑㈠箣閺冣偓閸?final): $finalReply")
                 speakReadySentences(finalReply, flushTail = true)
+                aiStreamDoneForCurrentTurn = true
+                continuousAutoListenPending = MMKVHelper.isContinuousDialogEnabled() && ttsEnqueuedCount.get() > 0
                 isFinalizingToAi = false
             },
             onError = { message ->
                 aiRequesting = false
                 isFinalizingToAi = false
+                resetContinuousRoundState()
                 Log.e(tag, "AI闂傚倸鍊峰ù鍥х暦閸偅鍙忛柡澶嬪殮濞差亶鏁囬柕蹇曞Х閸濇姊绘笟鍥у缂佸鏁诲畷鏇㈠箣閿旂晫鍘藉┑掳鍊愰崑鎾绘煟濡も偓濡稑鈻庨姀銈嗗€烽柛婵嗗妤犲洭姊洪崜鎻掍航闁稿瀚粋宥夘敍濠婂嫬浠? $message")
                 runOnUiThread {
                     Toast.makeText(this, getString(R.string.ai_error, message), Toast.LENGTH_SHORT).show()
@@ -383,7 +400,12 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         Log.d(tag, "TTS闂傚倸鍊搁崐椋庣矆娴ｉ潻鑰块梺顒€绉甸幆鐐哄箹濞ｎ剙濡奸柛灞诲姂閺屻倝骞侀幒鎴濆闂?segment): $segment")
         lastTtsRequestAt = SystemClock.elapsedRealtime()
         switchState(DigitalHumanState.SPEAKING)
-        ensureTtsReady(showHint = false) { engine -> engine?.speak(segment) }
+        ensureTtsReady(showHint = false) { engine ->
+            val ok = engine?.speak(segment) == true
+            if (ok) {
+                ttsEnqueuedCount.incrementAndGet()
+            }
+        }
     }
 
     private fun findSpeakBoundary(text: String, start: Int): Int {
@@ -443,10 +465,25 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             }
             engine?.setSpeakerId(currentSpeakerId)
             engine?.setSpeechRate(currentSpeechRate)
+            engine?.setOnSegmentDoneListener {
+                ttsPlayedCount.incrementAndGet()
+            }
             engine?.setOnIdleListener {
                 mainHandler.postDelayed({
                     val elapsed = SystemClock.elapsedRealtime() - lastTtsRequestAt
-                    if (!isListening && !aiRequesting && elapsed > 600L) {
+                    if (isListening || aiRequesting || isFinalizingToAi || elapsed <= 600L) {
+                        return@postDelayed
+                    }
+                    val ttsRoundComplete = aiStreamDoneForCurrentTurn &&
+                        ttsEnqueuedCount.get() > 0 &&
+                        ttsPlayedCount.get() >= ttsEnqueuedCount.get()
+
+                    if (MMKVHelper.isContinuousDialogEnabled() && continuousAutoListenPending && ttsRoundComplete) {
+                        resetContinuousRoundState()
+                        if (binding.btnStartListen.text.toString() == getString(R.string.start_asr_short)) {
+                            binding.btnStartListen.performClick()
+                        }
+                    } else {
                         switchState(DigitalHumanState.LEISURE)
                     }
                 }, 120L)
@@ -463,6 +500,13 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     private fun warmupEngines() {
         ensureAsrReady(showHint = false) {}
         ensureTtsReady(showHint = false) {}
+    }
+
+    private fun resetContinuousRoundState() {
+        continuousAutoListenPending = false
+        aiStreamDoneForCurrentTurn = false
+        ttsEnqueuedCount.set(0)
+        ttsPlayedCount.set(0)
     }
 
     private fun switchState(state: DigitalHumanState) {
@@ -601,6 +645,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 DashScopeManager.cancelCurrentStreaming()
                 aiRequesting = false
                 isFinalizingToAi = false
+                resetContinuousRoundState()
                 switchState(DigitalHumanState.LEISURE)
             }
             normalized.contains("\u518d\u89c1") -> {
@@ -608,6 +653,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 DashScopeManager.cancelCurrentStreaming()
                 aiRequesting = false
                 isFinalizingToAi = false
+                resetContinuousRoundState()
                 switchState(DigitalHumanState.LEISURE)
                 clearChatForGoodbye()
             }
@@ -615,12 +661,14 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
     }
 
     private fun clearChatForGoodbye() {
+        AiSession.updateSessionId()
         aiBubbleView = null
         userBubbleView = null
         spokenCursor = 0
         awaitingAsrFinal = false
         isFinalizingToAi = false
         aiRequesting = false
+        resetContinuousRoundState()
         binding.chatContainer.removeAllViews()
         binding.chatPanel.visibility = View.GONE
     }
@@ -878,6 +926,38 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         lastFaceDetected = faceNow
     }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

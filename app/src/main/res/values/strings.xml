@@ -51,6 +51,7 @@
     <string name="settings_back">返回</string>
     <string name="current_version_label">当前版本：%1$s</string>
     <string name="check_update">检查更新</string>
+    <string name="continuous_dialog_toggle">连续对话</string>
     <string name="face_detect_toggle">人脸检测</string>
     <string name="face_auto_dialog">检测到人脸自动开启对话</string>
     <string name="face_auto_greet">检测到人脸自动打招呼</string>
@@ -59,6 +60,16 @@
     <string name="relogin">重新登录</string>
     <string name="exit_app">退出应用</string>
     <string name="already_latest">当前已是最新版本</string>
+    <string name="checking_update">正在检查更新...</string>
+    <string name="update_dialog_title">发现新版本</string>
+    <string name="update_dialog_message">版本：%1$s（%2$d）\n\n更新内容：\n%3$s</string>
+    <string name="update_log_empty">暂无更新说明</string>
+    <string name="update_later">稍后更新</string>
+    <string name="update_now">立即更新</string>
+    <string name="update_downloading">正在下载更新包...</string>
+    <string name="update_check_failed">检查更新失败：%1$s</string>
+    <string name="update_download_failed">下载更新失败：%1$s</string>
+    <string name="update_enable_install_permission">请允许“安装未知应用”，然后再次点击更新安装</string>
 
     <string name="switch_character_short">切换人</string>
     <string name="switch_character_title">切换人物</string>
@@ -69,12 +80,16 @@
     <string name="character_1_name">人物1</string>
     <string name="character_2_name">人物2</string>
 
-    <string name="wakeup_start_failed">语音唤醒未启动，请检查讯飞参数与 ivw 资源。</string>`r`n    <string name="resource_prepare_title">资源准备中</string>
+    <string name="wakeup_start_failed">语音唤醒未启动，请检查讯飞参数与 ivw 资源。</string>
+
+    <string name="resource_prepare_title">资源准备中</string>
     <string name="resource_prepare_wait">正在准备资源...</string>
     <string name="resource_downloading_item">下载中：人物 %1$s / %2$s</string>
     <string name="resource_progress_percent">%1$d%%</string>
     <string name="resource_download_done">资源下载完成，正在进入主界面...</string>
     <string name="resource_download_failed">资源下载失败：%1$s</string>
     <string name="resource_empty">未获取到可用人物资源</string>
+    <string name="download_item_failed">下载失败：%1$s</string>
 </resources>
+
 

@@ -14,6 +14,7 @@ object MMKVHelper {
     private const val KEY_FACE_AUTO_GREET = "face_auto_greet"
     private const val KEY_RESOURCE_JSON = "resource_json"
     private const val KEY_CURRENT_CHARACTER_ID = "current_character_id"
+    private const val KEY_CONTINUOUS_DIALOG = "continuous_dialog"
 
     fun saveAccount(account: String, password: String, remember: Boolean) {
         mmkv.encode(KEY_ACCOUNT, account)
@@ -89,5 +90,13 @@ object MMKVHelper {
 
     fun getCurrentCharacterId(): String {
         return mmkv.decodeString(KEY_CURRENT_CHARACTER_ID, "").orEmpty()
+    }
+
+    fun setContinuousDialogEnabled(enabled: Boolean) {
+        mmkv.encode(KEY_CONTINUOUS_DIALOG, enabled)
+    }
+
+    fun isContinuousDialogEnabled(): Boolean {
+        return mmkv.decodeBool(KEY_CONTINUOUS_DIALOG, false)
     }
 }

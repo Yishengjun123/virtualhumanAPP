@@ -1,4 +1,4 @@
-package com.example.virhuman.ai.tts
+﻿package com.example.virhuman.ai.tts
 
 import android.content.Context
 import android.media.AudioAttributes
@@ -52,6 +52,9 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
 
     @Volatile
     private var onIdleListener: (() -> Unit)? = null
+
+    @Volatile
+    private var onSegmentDoneListener: (() -> Unit)? = null
 
     private data class AudioSegment(
         val sequence: Long,
@@ -111,10 +114,10 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
                 val generated = localTts.generate(text, speakerId, speechRate)
                 val samples = generated.samples
                 if (samples.isEmpty()) return@execute
-                Log.d(tag, "TTS閹绢厽濮?text): $text")
+                Log.d(tag, "TTS闁圭虎鍘芥慨?text): $text")
                 Log.d(
                     tag,
-                    "TTS閹绢厽濮?samples=${samples.size}, rate=${generated.sampleRate}, speechRate=$speechRate)"
+                    "TTS闁圭虎鍘芥慨?samples=${samples.size}, rate=${generated.sampleRate}, speechRate=$speechRate)"
                 )
 
                 val rawPcm = ShortArray(samples.size)
@@ -134,7 +137,7 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
                     }
                 }
             } catch (e: Exception) {
-                Log.e(tag, "TTS閹绢厽鏂佹径杈Е: ${e.message}", e)
+                Log.e(tag, "TTS闁圭虎鍘介弬浣瑰緞鏉堫偉袝: ${e.message}", e)
             } finally {
                 pendingSynthCount.decrementAndGet()
                 synchronized(pendingLock) {
@@ -154,6 +157,10 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
 
     override fun setOnIdleListener(listener: (() -> Unit)?) {
         onIdleListener = listener
+    }
+
+    override fun setOnSegmentDoneListener(listener: (() -> Unit)?) {
+        onSegmentDoneListener = listener
     }
 
 
@@ -260,6 +267,7 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
         writeAll(track, segment.pcm)
         waitForPlaybackComplete(track, startHead, segment.pcm.size)
         playing.set(false)
+        onSegmentDoneListener?.invoke()
     }
 
     private fun ensureAudioTrack(sampleRate: Int): AudioTrack? {
@@ -377,3 +385,4 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
         onIdleListener?.invoke()
     }
 }
+
