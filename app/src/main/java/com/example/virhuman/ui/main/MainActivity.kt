@@ -105,7 +105,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         val speakerId: Int,
         val speechRate: Float
     )
-
+    //样例数据
     private var characters: List<CharacterProfile> = listOf(
         CharacterProfile(
             id = "character_1",
@@ -171,7 +171,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         IflyWakeupManager.setWakeupCallback { keyword ->
             runOnUiThread { handleWakeupKeyword(keyword) }
         }
-
+        //点击按钮开始识别，识别后进入onfinalresult
         binding.btnStartListen.setOnClickListener {
             if (isListening) {
                 awaitingAsrFinal = false
@@ -234,7 +234,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             updateLiveUserBubble(text)
         }
     }
-
+    //在得到asr结果后更新字幕切换状态，发送给智能体sendtoai
     override fun onFinalResult(text: String) {
         awaitingAsrFinal = false
         isFinalizingToAi = true
@@ -326,7 +326,8 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         }
 
         aiRequesting = true
-        resetContinuousRoundState()
+        resetContinuousRoundState()
+
         runOnUiThread {
             Toast.makeText(this, R.string.ai_sent_toast, Toast.LENGTH_SHORT).show()
         }
@@ -340,9 +341,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         DashScopeManager.streamCall(
             prompt = prompt,
             onChunk = { chunk ->
-                Log.d(tag, "AI闂傚倸鍊搁崐鐑芥倿閿曞倸绠栭柛顐ｆ礀绾惧潡鏌熼幆鐗堫棄缁惧墽绮换娑㈠箣閺冣偓閸?chunk): $chunk")
                 mergedText = mergeStreamText(mergedText, chunk)
-                Log.d(tag, "AI闂傚倸鍊搁崐鐑芥倿閿曞倸绠栭柛顐ｆ礀绾惧潡鏌熼幆鐗堫棄缁惧墽绮换娑㈠箣閺冣偓閸?merged): $mergedText")
                 runOnUiThread { updateAiBubble(mergedText) }
                 speakReadySentences(mergedText, flushTail = false)
             },
@@ -358,7 +357,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                     return@streamCall
                 }
                 runOnUiThread { updateAiBubble(finalReply) }
-                Log.d(tag, "AI闂傚倸鍊搁崐鐑芥倿閿曞倸绠栭柛顐ｆ礀绾惧潡鏌熼幆鐗堫棄缁惧墽绮换娑㈠箣閺冣偓閸?final): $finalReply")
+                //得到ai完整回复后给到tts，进行播报
                 speakReadySentences(finalReply, flushTail = true)
                 aiStreamDoneForCurrentTurn = true
                 continuousAutoListenPending = MMKVHelper.isContinuousDialogEnabled() && ttsEnqueuedCount.get() > 0
@@ -368,7 +367,6 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
                 aiRequesting = false
                 isFinalizingToAi = false
                 resetContinuousRoundState()
-                Log.e(tag, "AI闂傚倸鍊峰ù鍥х暦閸偅鍙忛柡澶嬪殮濞差亶鏁囬柕蹇曞Х閸濇姊绘笟鍥у缂佸鏁诲畷鏇㈠箣閿旂晫鍘藉┑掳鍊愰崑鎾绘煟濡も偓濡稑鈻庨姀銈嗗€烽柛婵嗗妤犲洭姊洪崜鎻掍航闁稿瀚粋宥夘敍濠婂嫬浠? $message")
                 runOnUiThread {
                     Toast.makeText(this, getString(R.string.ai_error, message), Toast.LENGTH_SHORT).show()
                 }
@@ -397,7 +395,6 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
         spokenCursor = end
         if (segment.isEmpty()) return
 
-        Log.d(tag, "TTS闂傚倸鍊搁崐椋庣矆娴ｉ潻鑰块梺顒€绉甸幆鐐哄箹濞ｎ剙濡奸柛灞诲姂閺屻倝骞侀幒鎴濆闂?segment): $segment")
         lastTtsRequestAt = SystemClock.elapsedRealtime()
         switchState(DigitalHumanState.SPEAKING)
         ensureTtsReady(showHint = false) { engine ->
@@ -407,7 +404,7 @@ class MainActivity : AppCompatActivity(), AsrEngine.Callback {
             }
         }
     }
-
+    //由于ai是流式返回，所以tts为了体感上说出的更快，所以根据标点进行切割句子，把每个小句子先送给tts
     private fun findSpeakBoundary(text: String, start: Int): Int {
         for (i in start until text.length) {
             when (text[i]) {

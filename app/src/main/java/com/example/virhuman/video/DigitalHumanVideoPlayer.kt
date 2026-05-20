@@ -87,7 +87,7 @@ class DigitalHumanVideoPlayer(context: Context) {
         if (state == targetState && pendingSlot != null) return
         val uri = stateToAssetPath[state] ?: return
         targetState = state
-
+        //双播放器模式，current和target随时切换
         val current = activeSlot
         if (current == null) {
             val first = slotFront
@@ -142,7 +142,7 @@ class DigitalHumanVideoPlayer(context: Context) {
         target.player.prepare()
         target.player.playWhenReady = true
 
-        // Some devices may skip onRenderedFirstFrame callback occasionally.
+        //针对部分设备首帧回调不稳定的问题，增加了基于 STATE_READY 的兜底切换逻辑，420ms 后直接切换，提高跨设备稳定性。
         mainHandler.postDelayed({
             if (token != transitionToken) return@postDelayed
             if (pendingSlot !== target) return@postDelayed

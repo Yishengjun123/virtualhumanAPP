@@ -30,14 +30,19 @@ class SherpaAsrEngine(
     private var recognizer: OfflineRecognizer? = null
     private var ready = false
 
-    // Partial decoding + silence auto-stop
+    //每隔 700 毫秒做一次部分解码
     private val partialDecodeIntervalMs = 700L
     private val minSamplesForPartial = sampleRate / 2
+    //主要：如果静音累计达到 2 秒，就认为说完了
     private val silenceTimeoutMs = 2000L
     private val minSpeechRms = 0.010f
+    //如果说话累计达到 220 毫秒，就认为开始说话
     private val speechStartRequiredMs = 220L
+    //如果一直没说话，6.5 秒后自动结束（被2.8覆盖）
     private val noSpeechTimeoutMs = 6500L
+    //最长识别时间
     private val maxUtteranceMs = 20000L
+    //如果识别文本 2.8 秒没有变化，也可以判定基本说完
     private val stableTextTimeoutMs = 2800L
     private val minUtteranceForStableStopMs = 1200L
     private var lastDecodeTimeMs = 0L

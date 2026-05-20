@@ -56,7 +56,7 @@
     <string name="face_auto_dialog">检测到人脸自动开启对话</string>
     <string name="face_auto_greet">检测到人脸自动打招呼</string>
     <string name="face_detected_toast">检测到人脸</string>
-    <string name="face_greet_text">你好啊！快来和我说话吧！</string>
+    <string name="face_greet_text">哈喽啊！快来和我说话吧！</string>
     <string name="relogin">重新登录</string>
     <string name="exit_app">退出应用</string>
     <string name="already_latest">当前已是最新版本</string>

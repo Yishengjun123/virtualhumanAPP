@@ -59,15 +59,17 @@ class LoginActivity : AppCompatActivity() {
             var errorMessage: String? = null
             var showRequestError = false
             try {
+                //调用 requestLogin() 发起登录请求, 返回登录json
                 val loginJson = requestLogin(account, password)
                 val bizCode = loginJson.optInt("code", -1)
+                //先判断业务码 code == 0
                 if (bizCode != 0) {
                     runOnUiThread {
                         Toast.makeText(this, R.string.login_invalid_account, Toast.LENGTH_SHORT).show()
                     }
                     return@thread
                 }
-
+                //再读取返回结果里的 data.device  判断其中是否包含本机设备编号
                 val data = loginJson.optJSONObject("data")
                 val deviceArray = data?.optJSONArray("device")
                 var hasDevice = false
@@ -87,7 +89,8 @@ class LoginActivity : AppCompatActivity() {
                     }
                     return@thread
                 }
-
+                //只有同时满足“账号密码正确 + 当前设备已授权”，才算登录成功
+                //下面则根据账号和设备号开始获取数字人资源
                 val resourceText = requestResources(account, localDeviceCode)
                 val resourceParsed = ResourceParser.parseResponse(resourceText)
                 if (resourceParsed.code != 0 || resourceParsed.characters.isEmpty()) {
@@ -104,7 +107,6 @@ class LoginActivity : AppCompatActivity() {
                     finish()
                 }
             } catch (e: Exception) {
-                Log.e(tag, "login flow failed: ${e.message}", e)
                 errorMessage = e.message ?: "unknown"
                 showRequestError = true
             } finally {

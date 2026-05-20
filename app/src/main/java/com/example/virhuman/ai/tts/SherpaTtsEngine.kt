@@ -216,7 +216,7 @@ class SherpaTtsEngine(context: Context) : TtsEngine {
         ready = false
         synthExecutor.shutdownNow()
     }
-
+    //TTS 内部做了并行预合成 + 顺序播放  bufferedCount
     private fun startPlayerLoop() {
         playerThread = Thread({
             while (running.get()) {
